@@ -1,16 +1,24 @@
-# Interactive Conversation Simulator
+# Interactive Conversation Simulator V2
 
-This project allows you to visually design and simulate interactive voice conversations in Hebrew. It consists of three main parts:
+This project allows you to visually design and simulate complex, stateful interactive voice conversations in Hebrew. It's a powerful tool for prototyping and building automated call-center flows, voice assistants, and more.
 
-1.  **Server (Node.js/Express/MongoDB):** A backend service that stores and manages the conversation flows.
-2.  **Client (React):** A modern, web-based visual editor for creating and modifying conversation flows with a drag-and-drop interface.
-3.  **Simulator (Python):** A script that runs on your local machine, fetches a conversation flow from the server, and uses your microphone and speakers to simulate the conversation in real-time.
+This is the second version of the project, featuring a completely redesigned user interface and a more powerful, block-based logic system.
 
-## Architecture
+## Core Components
 
-*   The **React Client** provides a UI to build a conversation flow, which is represented as a graph of nodes (agent's responses) and edges (user's trigger phrases).
-*   The flow is saved to a **MongoDB database** via the **Node.js Server**.
-*   The **Python Simulator** fetches the flow from the server. It uses the `whisper` library for local, high-quality Hebrew speech-to-text and `gTTS` for text-to-speech. It navigates the conversation graph based on your spoken input.
+1.  **Server (Node.js/Express/MongoDB):** A backend service that stores and manages the conversation flows. It now supports a rich schema for different block types.
+2.  **Client (React):** A modern, web-based visual editor for creating and modifying conversation flows. It features a drag-and-drop interface with a sidebar of available blocks.
+3.  **Simulator (Python):** A script that runs a conversation flow. It operates as a state machine, executing each block's logic (speaking, listening, evaluating conditions) in sequence.
+
+## Block Types
+
+You can build your conversation by dragging these blocks from the sidebar onto the canvas:
+
+*   **🚀 Start:** The entry point for every conversation.
+*   **🗣️ Speak:** Makes the agent say a specific piece of text.
+*   **👂 Listen:** Pauses the flow and waits for the user to provide voice input.
+*   **🔀 Condition:** The core of your logic. It allows the conversation to branch based on keywords in the user's response. Each condition you add creates a new output handle on the block.
+*   **🏁 End:** Marks a final point in a conversation path.
 
 ## Getting Started
 
@@ -65,18 +73,15 @@ python main.py
 
 ## How to Use
 
-1.  **Start the Server and Client:** Follow the setup instructions above.
+1.  **Start the Server and Client.**
 2.  **Design a Conversation:**
     *   Open your browser to `http://localhost:3000`.
-    *   A default flow is created for you. You can change its name at the top.
-    *   Click "Add Node" to create new response blocks for the agent.
-    *   **Double-click a node's text to edit the agent's response.**
-    *   Drag from the handle at the bottom of one node to the handle at the top of another to connect them. You will be prompted to enter the "trigger phrase" the user needs to say to follow that path.
-    *   Click "Save" to persist your changes.
+    *   Drag blocks from the sidebar on the left onto the canvas.
+    *   Fill in the details for each block (e.g., the text for a "Speak" block, or keywords for a "Condition" block).
+    *   Connect the blocks by dragging from a source handle (bottom or right of a block) to a target handle (top of a block).
+    *   Give your flow a name in the top-left corner and click **Save Flow**.
 3.  **Run the Simulation:**
     *   Start the Python script from the `simulator` directory.
-    *   The script will load the first flow it finds.
-    *   The agent will speak the message from the "Start" node.
-    *   When you see "Listening...", say one of the trigger phrases you defined.
-    *   The conversation will proceed according to the flow you designed.
-    *   To end the simulation, say "סיים שיחה" (siyem sicha).
+    *   The script will automatically load the most recent conversation flow.
+    *   The simulation will begin, executing the logic you designed.
+    *   To end the simulation at any time, say "סיים שיחה" (siyem sicha).

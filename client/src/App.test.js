@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders the conversation flow builder title', () => {
+test('renders the sidebar with blocks', () => {
   render(<App />);
-  const titleElement = screen.getByText(/Conversation Flow Builder/i);
-  expect(titleElement).toBeInTheDocument();
+  const sidebarTitle = screen.getByText(/Blocks/i);
+  expect(sidebarTitle).toBeInTheDocument();
 });

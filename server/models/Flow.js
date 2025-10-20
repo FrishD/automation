@@ -1,13 +1,28 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-// This schema is designed to be flexible and store the state of a flow-based editor.
-// It's inspired by the data structure used by libraries like React Flow.
+// A more structured schema for the node's data payload,
+// allowing for different properties based on the node type.
+const NodeDataSchema = new Schema({
+  label: { type: String, required: true }, // A display name for the node
+
+  // Properties specific to node types
+  text: { type: String }, // For 'speak' nodes
+  conditions: [{ // For 'condition' nodes
+    keyword: { type: String, required: true },
+    targetNodeId: { type: String, required: true }
+  }],
+
+  // You can add more type-specific fields here as needed
+  // e.g., transferTo: { type: String } for a 'transfer' node
+
+}, { _id: false });
+
 
 const NodeSchema = new Schema({
   id: { type: String, required: true },
-  type: { type: String, required: true },
-  data: { type: Object, required: true },
+  type: { type: String, required: true }, // e.g., 'start', 'speak', 'listen', 'condition'
+  data: { type: NodeDataSchema, required: true },
   position: {
     x: { type: Number, required: true },
     y: { type: Number, required: true }
@@ -18,7 +33,7 @@ const EdgeSchema = new Schema({
   id: { type: String, required: true },
   source: { type: String, required: true },
   target: { type: String, required: true },
-  label: { type: String } // The "trigger" text will be stored here
+  sourceHandle: { type: String }, // To support multiple output points from a node (e.g., conditions)
 }, { _id: false });
 
 const FlowSchema = new Schema({
