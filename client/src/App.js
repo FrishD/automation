@@ -3,6 +3,7 @@ import ReactFlow, {
   ReactFlowProvider,
   Controls,
   Background,
+  MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -10,13 +11,18 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
-import './App.css';
 
 import StartNode from './components/nodes/StartNode.js';
 import SpeakNode from './components/nodes/SpeakNode.js';
 import ListenNode from './components/nodes/ListenNode.js';
 import ConditionNode from './components/nodes/ConditionNode.js';
 import EndNode from './components/nodes/EndNode.js';
+import VariableNode from './components/nodes/VariableNode.js';
+import WaitNode from './components/nodes/WaitNode.js';
+import LoopNode from './components/nodes/LoopNode.js';
+import PlayAudioNode from './components/nodes/PlayAudioNode.js';
+import ConfirmationNode from './components/nodes/ConfirmationNode.js';
+import SummaryNode from './components/nodes/SummaryNode.js';
 
 
 const API_URL = 'http://localhost:5000/api/flows';
@@ -30,6 +36,7 @@ const App = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
+  const [menu, setMenu] = useState(null);
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
     setNodes((nds) =>
@@ -48,6 +55,12 @@ const App = () => {
     listen: ListenNode,
     condition: ConditionNode,
     end: EndNode,
+    variable: VariableNode,
+    wait: WaitNode,
+    loop: LoopNode,
+    play_audio: PlayAudioNode,
+    confirmation: ConfirmationNode,
+    summary: SummaryNode,
   }), []);
 
   const nodesWithDataHandlers = useMemo(() => {
@@ -161,6 +174,28 @@ const App = () => {
     [reactFlowInstance, setNodes],
   );
 
+  const onPaneDoubleClick = (event) => {
+    const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    setMenu({
+      id: getId(),
+      top: event.clientY,
+      left: event.clientX,
+      data: { position }
+    });
+  };
+
+  const onSelect = (type) => {
+    const { id, data: { position } } = menu;
+    const newNode = {
+      id,
+      type,
+      position,
+      data: { label: `${type} node` },
+    };
+    setNodes((nds) => nds.concat(newNode));
+    setMenu(null);
+  };
+
   const saveFlow = async () => {
     if (!currentFlowId) return;
     try {
@@ -182,30 +217,73 @@ const App = () => {
   };
 
   return (
-    <div className="dndflow">
+    <div className="flex h-screen">
       <ReactFlowProvider>
         <Sidebar />
-        <div className="reactflow-wrapper" ref={reactFlowWrapper}>
-          <ReactFlow
-            nodes={nodesWithDataHandlers}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            fitView
-            nodeTypes={nodeTypes}
-          >
-            <Controls />
-            <Background variant="dots" gap={12} size={1} />
-             <div className="top-bar">
-                <input value={flowName} onChange={(e) => setFlowName(e.target.value)} className="nodrag"/>
-                <button onClick={saveFlow}>Save Flow</button>
+        <main className="flex-1 bg-background-light dark:bg-background-dark p-6">
+          <div className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col" style={{backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
+            <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
+              <div className="flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
+                <div className="flex items-center gap-1">
+                  <button className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-outlined text-lg">undo</span>
+                  </button>
+                  <button className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-outlined text-lg">redo</span>
+                  </button>
+                </div>
+                <h2 className="text-sm font-medium text-on-surface-light dark:text-on-surface-dark">{flowName}</h2>
+                <div className="flex items-center gap-1.5 mr-1">
+                  <button className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+                    <span className="material-symbols-outlined text-base">upload</span>
+                    <span>Load</span>
+                  </button>
+                  <button onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
+                    <span className="material-symbols-outlined text-base">save</span>
+                    <span>Save</span>
+                  </button>
+                </div>
+              </div>
+              <ReactFlow
+                nodes={nodesWithDataHandlers}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onInit={setReactFlowInstance}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onPaneDoubleClick={onPaneDoubleClick}
+                fitView
+                nodeTypes={nodeTypes}
+              >
+                <Background variant="dots" gap={20} size={1} />
+                <Controls className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1" />
+                <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />
+              </ReactFlow>
+              {menu && (
+                <div
+                  className="absolute z-30 w-56 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-2"
+                  style={{ top: menu.top, left: menu.left }}
+                  onClick={() => setMenu(null)}
+                >
+                  <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('speak')}>
+                    <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">record_voice_over</span>
+                    <span>Speak</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('listen')}>
+                    <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hearing</span>
+                    <span>Listen</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('condition')}>
+                    <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">call_split</span>
+                    <span>If</span>
+                  </a>
+                </div>
+              )}
             </div>
-          </ReactFlow>
-        </div>
+          </div>
+        </main>
       </ReactFlowProvider>
     </div>
   );

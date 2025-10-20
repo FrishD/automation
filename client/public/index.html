@@ -24,9 +24,63 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>React App</title>
+    <title>Stitch Design</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        colors: {
+                            "primary": {
+                                "DEFAULT": "#4f46e5",
+                                "light": "#e0e7ff"
+                            },
+                            "background": {
+                                "light": "#f8fafc",
+                                "dark": "#020617"
+                            },
+                            "surface": {
+                                "light": "#ffffff",
+                                "dark": "#1e293b"
+                            },
+                            "on-surface": {
+                                "light": "#0f172a",
+                                "dark": "#f8fafc"
+                            },
+                            "muted": {
+                                "light": "#94a3b8",
+                                "dark": "#94a3b8"
+                            },
+                            "border-light": "#e2e8f0",
+                            "border-dark": "#334155"
+                        },
+                        fontFamily: {
+                            "display": ["Inter"]
+                        },
+                        borderRadius: {
+                            "DEFAULT": "0.5rem",
+                            "lg": "0.75rem",
+                            "xl": "1rem",
+                            "full": "9999px"
+                        },
+                    },
+                },
+            }
+        </script>
+    <style type="text/tailwindcss">
+        .connector-path {
+            fill: none;
+            stroke: #94a3b8;
+            stroke-width: 2;
+        }
+    </style>
   </head>
-  <body>
+  <body class="bg-background-light dark:bg-background-dark font-display text-on-surface-light dark:text-on-surface-dark">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     <!--

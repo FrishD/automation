@@ -1,23 +1,23 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 
-const SpeakNode = ({ data }) => {
+const SummaryNode = ({ data, selected }) => {
   return (
-    <div className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-56">
+    <div className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64 ${selected ? 'border-primary ring-4 ring-primary/20' : ''}`}>
       <div className="flex items-center gap-3">
-        <span className="material-symbols-outlined text-primary text-2xl">record_voice_over</span>
-        <span className="font-semibold text-sm">Speak</span>
+        <span className="material-symbols-outlined text-primary text-2xl">summarize</span>
+        <span className="font-semibold text-sm">Summary</span>
       </div>
       <div className="space-y-3 pt-3 border-t border-border-light dark:border-border-dark">
         <div>
-          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="text">Text to say</label>
+          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="summary-text">Summary Text</label>
           <textarea
             className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
-            id="text"
-            placeholder="Enter text..."
+            id="summary-text"
+            placeholder="e.g., Your order for {item} is confirmed."
             rows="3"
-            defaultValue={data.text}
-            onChange={(e) => data.onChange({ ...data, text: e.target.value })}
+            defaultValue={data.summaryText}
+            onChange={(e) => data.onChange({ ...data, summaryText: e.target.value })}
           ></textarea>
         </div>
       </div>
@@ -35,4 +35,4 @@ const SpeakNode = ({ data }) => {
   );
 };
 
-export default SpeakNode;
+export default SummaryNode;

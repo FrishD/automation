@@ -1,58 +1,58 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 
-const ConditionNode = ({ data, id }) => {
-    // Ensure data.conditions is an array
-    const initialConditions = Array.isArray(data.conditions) ? data.conditions : [];
-    const [conditions, setConditions] = useState(initialConditions);
+const ConditionNode = ({ data }) => {
+    const [conditions, setConditions] = useState(data.conditions || [{ keyword: '' }]);
 
     const handleConditionChange = (index, value) => {
         const newConditions = [...conditions];
         newConditions[index] = { ...newConditions[index], keyword: value };
         setConditions(newConditions);
-
-        // This is crucial: update the node's data object in the parent component's state
-        if (data.onChange) {
-            data.onChange({ ...data, conditions: newConditions });
-        }
+        data.onChange({ ...data, conditions: newConditions });
     };
 
     const addCondition = () => {
         const newConditions = [...conditions, { keyword: '' }];
         setConditions(newConditions);
-        if (data.onChange) {
-            data.onChange({ ...data, conditions: newConditions });
-        }
+        data.onChange({ ...data, conditions: newConditions });
     };
 
     return (
-        <div className="react-flow__node-condition">
-            <Handle type="target" position={Position.Top} />
-            <div className="node-header">
-                <span className="icon">🔀</span>
-                <span>Condition</span>
+        <div className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64">
+            <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-2xl">call_split</span>
+                <span className="font-semibold text-sm">If Condition</span>
             </div>
-            <div className="node-body">
+            <div className="space-y-3 pt-3 border-t border-border-light dark:border-border-dark">
                 {conditions.map((cond, index) => (
-                    <div key={index} className="condition-item">
-                        <span>If user says:</span>
+                    <div key={index} className="flex items-center gap-2 relative">
                         <input
                             type="text"
-                            placeholder="e.g., 'yes'"
+                            placeholder="Keyword or phrase..."
                             defaultValue={cond.keyword}
                             onChange={(e) => handleConditionChange(index, e.target.value)}
-                            className="nodrag" // Prevents node dragging when interacting with input
+                            className="nodrag w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
                         />
                         <Handle
                             type="source"
                             position={Position.Right}
                             id={`${index}`}
-                            style={{ top: `${(index + 1) * 45 + 15}px` }}
+                            className="absolute -right-3.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
                         />
                     </div>
                 ))}
-                <button onClick={addCondition} className="nodrag">+ Add Condition</button>
+                <button
+                    onClick={addCondition}
+                    className="nodrag text-xs font-medium text-primary hover:text-primary/80"
+                >
+                    + Add Condition
+                </button>
             </div>
+            <Handle
+                type="target"
+                position={Position.Left}
+                className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
+            />
         </div>
     );
 };
