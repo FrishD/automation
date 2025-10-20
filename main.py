@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*- 
 # -*- coding: utf-8 -*-
-from tts_hebrew import speak_hebrew
+# -*- coding: utf-8 -*-
+from simulator.tts_hebrew import speak_hebrew
 from stt_hebrew import listen_hebrew
 from datetime import datetime
 
