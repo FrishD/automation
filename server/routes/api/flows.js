@@ -55,7 +55,8 @@ router.put('/:id', async (req, res) => {
 
     res.json(flow);
   } catch (err) {
-    res.status(400).json({ message: 'Error updating flow' });
+    console.error('Error updating flow:', err); // Log the full error
+    res.status(400).json({ message: 'Error updating flow', error: err.message });
   }
 });
 

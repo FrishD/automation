@@ -1,21 +1,15 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-// A more structured schema for the node's data payload,
-// allowing for different properties based on the node type.
+// Schema for a single condition within a condition node
+const ConditionSchema = new Schema({
+  keyword: { type: String, required: true }
+}, { _id: false });
+
 const NodeDataSchema = new Schema({
-  label: { type: String, required: true }, // A display name for the node
-
-  // Properties specific to node types
+  label: { type: String }, // Display name for the node in the UI
   text: { type: String }, // For 'speak' nodes
-  conditions: [{ // For 'condition' nodes
-    keyword: { type: String, required: true },
-    targetNodeId: { type: String, required: true }
-  }],
-
-  // You can add more type-specific fields here as needed
-  // e.g., transferTo: { type: String } for a 'transfer' node
-
+  conditions: [ConditionSchema], // For 'condition' nodes
 }, { _id: false });
 
 
@@ -33,7 +27,8 @@ const EdgeSchema = new Schema({
   id: { type: String, required: true },
   source: { type: String, required: true },
   target: { type: String, required: true },
-  sourceHandle: { type: String }, // To support multiple output points from a node (e.g., conditions)
+  sourceHandle: { type: String }, // For condition nodes, this will be the index of the condition
+  label: { type: String }, // The keyword from the condition will now be stored on the edge label
 }, { _id: false });
 
 const FlowSchema = new Schema({

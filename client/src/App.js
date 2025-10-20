@@ -31,6 +31,17 @@ const App = () => {
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
 
+  const onNodeDataChange = useCallback((nodeId, newData) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          return { ...node, data: { ...node.data, ...newData } };
+        }
+        return node;
+      })
+    );
+  }, [setNodes]);
+
   const nodeTypes = useMemo(() => ({
     start: StartNode,
     speak: SpeakNode,
@@ -39,29 +50,19 @@ const App = () => {
     end: EndNode,
   }), []);
 
-  useEffect(() => {
-    const fetchInitialFlow = async () => {
-      try {
-        const response = await axios.get(API_URL);
-        if (response.data && response.data.length > 0) {
-          const firstFlow = response.data[0];
-          setNodes(firstFlow.nodes || []);
-          setEdges(firstFlow.edges || []);
-          setFlowName(firstFlow.name || 'Untitled Flow');
-          setCurrentFlowId(firstFlow._id);
-        } else {
-          createNewFlow();
-        }
-      } catch (error) {
-        console.error("Error fetching flows:", error);
+  const nodesWithDataHandlers = useMemo(() => {
+    return nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        onChange: (newData) => onNodeDataChange(node.id, newData)
       }
-    };
-    fetchInitialFlow();
-  }, []);
+    }));
+  }, [nodes, onNodeDataChange]);
 
-  const createNewFlow = async () => {
+  const createNewFlow = useCallback(async () => {
     try {
-        const initialNodes = [{ id: 'start_node', type: 'start', position: { x: 150, y: 150 }, data: { label: 'Start' } }];
+        const initialNodes = [{ id: 'start_node_0', type: 'start', position: { x: 150, y: 150 }, data: { label: 'Start' } }];
         const response = await axios.post(API_URL, {
             name: 'New Conversation',
             nodes: initialNodes,
@@ -75,15 +76,58 @@ const App = () => {
     } catch (error) {
         console.error("Error creating new flow:", error);
     }
-};
+  }, [setNodes, setEdges]);
+
+
+  useEffect(() => {
+    const fetchInitialFlow = async () => {
+      try {
+        const response = await axios.get(API_URL);
+        console.log('Fetched data:', response.data); // DEBUGGING
+        if (response.data && response.data.length > 0) {
+          const firstFlow = response.data[0];
+          setNodes(firstFlow.nodes || []);
+          setEdges(firstFlow.edges || []);
+          setFlowName(firstFlow.name || 'Untitled Flow');
+          setCurrentFlowId(firstFlow._id);
+          id = firstFlow.nodes.length + 1;
+        } else {
+          createNewFlow();
+        }
+      } catch (error) {
+        console.error("Error fetching flows:", error);
+      }
+    };
+    fetchInitialFlow();
+  }, [setNodes, setEdges, createNewFlow]);
+
+  // Effect to update edge labels when a condition node's data changes
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((edge) => {
+        if (edge.sourceHandle) {
+          const sourceNode = nodes.find((node) => node.id === edge.source);
+          if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
+            const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
+            edge.label = keyword || `[Connect to save keyword]`;
+          }
+        }
+        return edge;
+      })
+    );
+  }, [nodes, setEdges]);
 
   const onConnect = useCallback((params) => {
-    // For condition nodes, the handle ID tells us which condition it is
-    if (params.sourceHandle) {
-        params.label = `Condition ${params.sourceHandle}`;
+    let newEdge = { ...params };
+    const sourceNode = nodes.find(node => node.id === params.source);
+    if (sourceNode && params.sourceHandle) {
+        if (sourceNode.data.conditions && sourceNode.data.conditions[params.sourceHandle]) {
+            const keyword = sourceNode.data.conditions[params.sourceHandle].keyword;
+            newEdge.label = keyword || `[Connect to save keyword]`;
+        }
     }
-    setEdges((eds) => addEdge(params, eds))
-    }, [setEdges]);
+    setEdges((eds) => addEdge(newEdge, eds));
+    }, [nodes, setEdges]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -93,35 +137,41 @@ const App = () => {
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-
       const type = event.dataTransfer.getData('application/reactflow');
-      if (typeof type === 'undefined' || !type) {
-        return;
-      }
+      if (!type) return;
 
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
+      const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+
+      let initialData = { label: `${type} node` };
+      if (type === 'condition') {
+          initialData.conditions = [{ keyword: '' }];
+      } else if (type === 'speak') {
+          initialData.text = 'Agent says...';
+      }
 
       const newNode = {
         id: getId(),
         type,
         position,
-        data: { label: `${type} node` }, // Initial data
+        data: initialData,
       };
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [reactFlowInstance],
+    [reactFlowInstance, setNodes],
   );
 
   const saveFlow = async () => {
     if (!currentFlowId) return;
     try {
+        const nodesToSave = nodes.map(({ data, ...node }) => {
+            const { onChange, ...restData } = data;
+            return { ...node, data: restData };
+        });
+
         await axios.put(`${API_URL}/${currentFlowId}`, {
             name: flowName,
-            nodes: nodes,
+            nodes: nodesToSave,
             edges: edges,
         });
         alert('Flow saved!');
@@ -137,7 +187,7 @@ const App = () => {
         <Sidebar />
         <div className="reactflow-wrapper" ref={reactFlowWrapper}>
           <ReactFlow
-            nodes={nodes}
+            nodes={nodesWithDataHandlers}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
@@ -151,7 +201,7 @@ const App = () => {
             <Controls />
             <Background variant="dots" gap={12} size={1} />
              <div className="top-bar">
-                <input value={flowName} onChange={(e) => setFlowName(e.target.value)} />
+                <input value={flowName} onChange={(e) => setFlowName(e.target.value)} className="nodrag"/>
                 <button onClick={saveFlow}>Save Flow</button>
             </div>
           </ReactFlow>

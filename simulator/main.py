@@ -24,7 +24,7 @@ def speak(text):
     except Exception as e:
         print(f"Error in text-to-speech: {e}")
 
-def listen_for_command():
+def listen_for_command(model):
     """Listens for a command from the user and returns it as text."""
     r = sr.Recognizer()
     with sr.Microphone() as source:
@@ -39,7 +39,6 @@ def listen_for_command():
         with open(temp_audio_path, "wb") as f:
             f.write(audio.get_wav_data())
 
-        model = whisper.load_model("base")
         result = model.transcribe(temp_audio_path, fp16=False)
         command = result["text"]
 
@@ -52,9 +51,10 @@ def listen_for_command():
 
 # --- Conversation Engine ---
 class ConversationEngine:
-    def __init__(self, flow_data):
+    def __init__(self, flow_data, whisper_model):
         self.nodes = {node['id']: node for node in flow_data['nodes']}
         self.edges = flow_data['edges']
+        self.whisper_model = whisper_model
         self.current_node_id = self._get_node_by_type('start')
         if not self.current_node_id:
             raise ValueError("Flow must have one 'start' node.")
@@ -67,12 +67,15 @@ class ConversationEngine:
 
     def _find_next_node_id(self, source_node_id, source_handle=None):
         for edge in self.edges:
-            if edge['source'] == source_node_id and (source_handle is None or edge['sourceHandle'] == source_handle):
-                return edge['target']
+            if edge['source'] == source_node_id:
+                if source_handle is None or edge.get('sourceHandle') == source_handle:
+                    return edge['target']
         return None
 
     def run(self):
         """Executes the conversation flow step by step."""
+        user_input_from_listen = ""
+
         while self.current_node_id:
             node = self.nodes.get(self.current_node_id)
             if not node:
@@ -89,45 +92,36 @@ class ConversationEngine:
             elif node_type == 'speak':
                 text_to_speak = node_data.get('text', "I don't know what to say.")
                 speak(text_to_speak)
-                time.sleep(1) # Pause after speaking
+                time.sleep(1)
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
-                user_input = listen_for_command()
-                if "סיים שיחה" in user_input:
+                user_input_from_listen = listen_for_command(self.whisper_model)
+                if "סיים שיחה" in user_input_from_listen:
                     speak("מסיים את השיחה. להתראות!")
                     break
-
-                # The 'listen' node itself doesn't have logic,
-                # it transitions to a 'condition' node which does.
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
-                # Pass the user input to the next node (which should be a condition node)
-                if self.current_node_id:
-                    self.nodes[self.current_node_id]['data']['_internal_user_input'] = user_input
-
 
             elif node_type == 'condition':
-                user_input = node_data.get('_internal_user_input', '')
                 conditions = node_data.get('conditions', [])
 
                 next_node_found = False
                 for i, condition in enumerate(conditions):
                     keyword = condition.get('keyword', '').lower()
-                    if keyword and keyword in user_input:
+                    if keyword and keyword in user_input_from_listen:
                         self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle=str(i))
                         next_node_found = True
                         break
 
                 if not next_node_found:
                     speak("לא הבנתי, אפשר לחזור על דבריך?")
-                    # This should ideally loop back to a 'listen' node.
-                    # For simplicity, we'll just stop if no condition is met.
-                    self.current_node_id = None
-
+                    # This logic needs to be improved to find the previous listen node
+                    # For now, we find the first listen node in the flow.
+                    self.current_node_id = self._get_node_by_type('listen')
 
             elif node_type == 'end':
                 print("--- Conversation Ended ---")
-                speak("השיחה הסתיימה. להתראות!")
+                speak(node_data.get('label', "השיחה הסתיימה. להתראות!"))
                 self.current_node_id = None
 
             else:
@@ -159,5 +153,10 @@ if __name__ == "__main__":
 
     flow = get_flow_from_server(FLOW_ID)
     if flow:
-        engine = ConversationEngine(flow)
+        # Load the whisper model once
+        print("Loading speech recognition model...")
+        whisper_model = whisper.load_model("base")
+        print("Model loaded.")
+
+        engine = ConversationEngine(flow, whisper_model)
         engine.run()
