@@ -60,15 +60,15 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === nodeId) {
-          return { ...node, data: { ...node.data, ...newData } };
-        }
-        return node;
-      })
-    );
-  }, [setNodes]);
+    const newNodes = nodes.present.map((node) => {
+      if (node.id === nodeId) {
+        return { ...node, data: { ...node.data, ...newData } };
+      }
+      return node;
+    });
+    setNodes(newNodes);
+  }, [nodes.present, setNodes]);
+
 
   const nodesWithDataHandlers = useMemo(() => {
     return nodes.present.map(node => ({
@@ -78,7 +78,7 @@ const App = () => {
         onChange: (newData) => onNodeDataChange(node.id, newData)
       }
     }));
-  }, [nodes, onNodeDataChange]);
+  }, [nodes.present, onNodeDataChange]);
 
   const createNewFlow = useCallback(async () => {
     try {
@@ -179,13 +179,23 @@ const App = () => {
         data: initialData,
       };
 
-      setNodes((nds) => nds.concat(newNode));
+      setNodes(nodes.present.concat(newNode));
     },
-    [reactFlowInstance, setNodes],
+    [reactFlowInstance, nodes.present, setNodes],
   );
 
   const onPaneContextMenu = (event) => {
     event.preventDefault();
+    const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    setMenu({
+      id: getId(),
+      top: event.clientY,
+      left: event.clientX,
+      data: { position }
+    });
+  };
+
+  const onPaneDoubleClick = (event) => {
     const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: getId(),
@@ -213,7 +223,7 @@ const App = () => {
       position,
       data: { label: `${type} node` },
     };
-    setNodes((nds) => nds.concat(newNode));
+    setNodes(nodes.present.concat(newNode));
     setMenu(null);
   };
 
@@ -292,6 +302,7 @@ const App = () => {
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 onPaneContextMenu={onPaneContextMenu}
+                onPaneDoubleClick={onPaneDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
                 fitView
                 nodeTypes={nodeTypes}
