@@ -49,8 +49,8 @@ const App = () => {
   const reactFlowWrapper = useRef(null);
   const [nodes, { set: setNodes, undo: undoNodes, redo: redoNodes, canUndo: canUndoNodes, canRedo: canRedoNodes }] = useUndo([]);
   const [edges, { set: setEdges, undo: undoEdges, redo: redoEdges, canUndo: canUndoEdges, canRedo: canRedoEdges }] = useUndo([]);
-  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
-  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes.present));
+  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges.present));
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
@@ -70,7 +70,7 @@ const App = () => {
   }, [setNodes]);
 
   const nodesWithDataHandlers = useMemo(() => {
-    return nodes.map(node => ({
+    return nodes.present.map(node => ({
       ...node,
       data: {
         ...node.data,
