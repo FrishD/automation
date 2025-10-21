@@ -57,6 +57,7 @@ const App = () => {
   const [menu, setMenu] = useState(null);
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [showMinimap, setShowMinimap] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
     setNodes((nds) =>
@@ -100,9 +101,9 @@ const App = () => {
 
   useEffect(() => {
     const fetchInitialFlow = async () => {
+      setLoading(true);
       try {
         const response = await axios.get(API_URL);
-        console.log('Fetched data:', response.data); // DEBUGGING
         if (response.data && response.data.length > 0) {
           const firstFlow = response.data[0];
           setNodes(firstFlow.nodes || []);
@@ -111,10 +112,12 @@ const App = () => {
           setCurrentFlowId(firstFlow._id);
           id = firstFlow.nodes.length + 1;
         } else {
-          createNewFlow();
+          await createNewFlow();
         }
       } catch (error) {
         console.error("Error fetching flows:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchInitialFlow();
@@ -122,10 +125,11 @@ const App = () => {
 
   // Effect to update edge labels when a condition node's data changes
   useEffect(() => {
-    setEdges((eds) =>
-      eds.map((edge) => {
+    if (loading) return;
+    setEdges(
+      edges.present.map((edge) => {
         if (edge.sourceHandle) {
-          const sourceNode = nodes.find((node) => node.id === edge.source);
+          const sourceNode = nodes.present.find((node) => node.id === edge.source);
           if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
             const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
             edge.label = keyword || `[Connect to save keyword]`;
@@ -134,19 +138,19 @@ const App = () => {
         return edge;
       })
     );
-  }, [nodes, setEdges]);
+  }, [nodes.present, setEdges, loading]);
 
   const onConnect = useCallback((params) => {
     let newEdge = { ...params };
-    const sourceNode = nodes.find(node => node.id === params.source);
+    const sourceNode = nodes.present.find(node => node.id === params.source);
     if (sourceNode && params.sourceHandle) {
         if (sourceNode.data.conditions && sourceNode.data.conditions[params.sourceHandle]) {
             const keyword = sourceNode.data.conditions[params.sourceHandle].keyword;
             newEdge.label = keyword || `[Connect to save keyword]`;
         }
     }
-    setEdges((eds) => addEdge(newEdge, eds));
-    }, [nodes, setEdges]);
+    setEdges(addEdge(newEdge, edges.present));
+    }, [nodes.present, setEdges, edges.present]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -233,6 +237,14 @@ const App = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Loading conversation...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen">
       <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
@@ -272,7 +284,7 @@ const App = () => {
               </div>
               <ReactFlow
                 nodes={nodesWithDataHandlers}
-                edges={edges}
+                edges={edges.present}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
