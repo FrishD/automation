@@ -166,10 +166,38 @@ const App = () => {
       const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
 
       let initialData = { label: `${type} node` };
-      if (type === 'condition') {
-          initialData.conditions = [{ keyword: '' }];
-      } else if (type === 'speak') {
+      switch (type) {
+        case 'speak':
           initialData.text = 'Agent says...';
+          break;
+        case 'condition':
+          initialData.conditions = [{ keyword: '' }];
+          break;
+        case 'wait':
+          initialData.duration = 1;
+          initialData.units = 'seconds';
+          break;
+        case 'variable':
+          initialData.variableAction = 'set';
+          initialData.variableName = 'myVar';
+          initialData.variableValue = 'value';
+          break;
+        case 'play_audio':
+          initialData.url = 'https://example.com/audio.mp3';
+          break;
+        case 'confirmation':
+          initialData.text = 'Are you sure?';
+          break;
+        case 'summary':
+          initialData.text = 'Thank you for calling.';
+          initialData.enableRating = false;
+          break;
+        case 'loop':
+            initialData.loopType = 'count';
+            initialData.count = 2;
+            break;
+        default:
+          break;
       }
 
       const newNode = {
@@ -217,11 +245,45 @@ const App = () => {
 
   const onSelect = (type) => {
     const { id, data: { position } } = menu;
+     let initialData = { label: `${type} node` };
+      switch (type) {
+        case 'speak':
+          initialData.text = 'Agent says...';
+          break;
+        case 'condition':
+          initialData.conditions = [{ keyword: '' }];
+          break;
+        case 'wait':
+          initialData.duration = 1;
+          initialData.units = 'seconds';
+          break;
+        case 'variable':
+          initialData.variableAction = 'set';
+          initialData.variableName = 'myVar';
+          initialData.variableValue = 'value';
+          break;
+        case 'play_audio':
+          initialData.url = 'https://example.com/audio.mp3';
+          break;
+        case 'confirmation':
+          initialData.text = 'Are you sure?';
+          break;
+        case 'summary':
+          initialData.text = 'Thank you for calling.';
+          initialData.enableRating = false;
+          break;
+        case 'loop':
+            initialData.loopType = 'count';
+            initialData.count = 2;
+            break;
+        default:
+          break;
+      }
     const newNode = {
       id,
       type,
       position,
-      data: { label: `${type} node` },
+      data: initialData,
     };
     setNodes(nodes.present.concat(newNode));
     setMenu(null);
@@ -346,6 +408,32 @@ const App = () => {
                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('condition')}>
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">call_split</span>
                         <span>If</span>
+                      </button>
+                      <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('variable')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">data_object</span>
+                        <span>Variable</span>
+                      </button>
+                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('wait')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hourglass_empty</span>
+                        <span>Wait</span>
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('play_audio')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">volume_up</span>
+                        <span>Play Audio</span>
+                      </button>
+                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('loop')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">replay</span>
+                        <span>Loop</span>
+                      </button>
+                      <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('confirmation')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">rule</span>
+                        <span>Confirmation</span>
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('summary')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">summarize</span>
+                        <span>Summary</span>
                       </button>
                     </>
                   )}

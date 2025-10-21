@@ -8,8 +8,30 @@ const ConditionSchema = new Schema({
 
 const NodeDataSchema = new Schema({
   label: { type: String }, // Display name for the node in the UI
-  text: { type: String }, // For 'speak' nodes
+  text: { type: String }, // For 'speak', 'confirmation', 'summary' nodes
   conditions: [ConditionSchema], // For 'condition' nodes
+
+  // Fields for 'wait' node
+  duration: { type: Number },
+  units: { type: String, enum: ['seconds', 'minutes'] },
+
+  // Fields for 'loop' node
+  loopType: { type: String, enum: ['count', 'condition'] },
+  count: { type: Number },
+  variable: { type: String }, // variable name for condition
+  operator: { type: String }, // e.g., '==', '!=', '<', '>'
+  value: { type: Schema.Types.Mixed }, // value for condition
+
+  // Fields for 'variable' node
+  variableAction: { type: String, enum: ['set', 'save_last_response'] },
+  variableName: { type: String },
+  variableValue: { type: Schema.Types.Mixed }, // value to set
+
+  // Fields for 'play_audio' node
+  url: { type: String },
+
+  // Fields for 'summary' node
+  enableRating: { type: Boolean }
 }, { _id: false });
 
 

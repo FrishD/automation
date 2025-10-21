@@ -3,3 +3,4 @@ gTTS
 requests
 PyAudio
 playsound==1.2.2
+SpeechRecognition

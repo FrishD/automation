@@ -1,9 +1,17 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 
-const PlayAudioNode = ({ data, selected }) => {
+const PlayAudioNode = ({ data }) => {
+  const { url = '', onChange } = data;
+
+  const handleDataChange = (newData) => {
+    if (onChange) {
+      onChange({ ...data, ...newData });
+    }
+  };
+
   return (
-    <div className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-56 ${selected ? 'border-primary ring-4 ring-primary/20' : ''}`}>
+    <div className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64">
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-primary text-2xl">volume_up</span>
         <span className="font-semibold text-sm">Play Audio</span>
@@ -12,12 +20,12 @@ const PlayAudioNode = ({ data, selected }) => {
         <div>
           <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="audio-url">Audio URL</label>
           <input
-            className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
-            id="audio-url"
-            placeholder="e.g., https://example.com/audio.mp3"
             type="text"
-            defaultValue={data.audioUrl}
-            onChange={(e) => data.onChange({ ...data, audioUrl: e.target.value })}
+            id="audio-url"
+            className="mt-1 nodrag w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+            placeholder="https://example.com/audio.mp3"
+            defaultValue={url}
+            onChange={(e) => handleDataChange({ url: e.target.value })}
           />
         </div>
       </div>
