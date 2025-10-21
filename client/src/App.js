@@ -28,6 +28,7 @@ import ConfirmationNode from './components/nodes/ConfirmationNode.js';
 import SummaryNode from './components/nodes/SummaryNode.js';
 import Notification from './components/Notification.js';
 import EditableTitle from './components/EditableTitle.js';
+import FlowCanvas from './components/FlowCanvas.js';
 
 
 const API_URL = 'http://localhost:5000/api/flows';
@@ -73,12 +74,6 @@ const App = () => {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [showMinimap, setShowMinimap] = useState(true);
   const [loading, setLoading] = useState(true);
-  const { deleteElements } = useReactFlow();
-
-  const onNodesDelete = useCallback(() => {
-    deleteElements({ nodes, edges });
-  }, [nodes, edges, deleteElements]);
-
   const onNodeDragStop = useCallback((event, node) => {
     const parentNode = nodes.find(n =>
       node.position.x >= n.position.x &&
@@ -419,7 +414,7 @@ const App = () => {
                   </button>
                 </div>
               </div>
-              <ReactFlow
+              <FlowCanvas
                 nodes={nodesWithDataHandlers}
                 edges={edges}
                 onNodesChange={onNodesChange}
@@ -431,25 +426,10 @@ const App = () => {
                 onPaneContextMenu={onPaneContextMenu}
                 onPaneDoubleClick={onPaneDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
-                onNodesDelete={onNodesDelete}
                 onNodeDragStop={onNodeDragStop}
-                deleteKeyCode={'Backspace'}
-                fitView
                 nodeTypes={nodeTypes}
-              >
-                <Background variant="dots" gap={20} size={1} />
-                <Controls className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1" />
-                <Draggable
-                  defaultPosition={JSON.parse(localStorage.getItem('minimapPos')) || {x: window.innerWidth - 1000, y: 20}}
-                  onStop={(e, data) => localStorage.setItem('minimapPos', JSON.stringify({x: data.x, y: data.y}))}
-                  handle=".minimap-handle"
-                >
-                  <div className={`absolute z-20 transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0'}`}>
-                    <div className="minimap-handle cursor-move h-6 w-full bg-slate-200 dark:bg-slate-700 rounded-t-lg"></div>
-                    <MiniMap className="w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-b-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden" />
-                  </div>
-                </Draggable>
-              </ReactFlow>
+                showMinimap={showMinimap}
+              />
               {menu && (
                 <div
                   className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
