@@ -51,6 +51,7 @@ const nodeTypes = {
 
 const App = () => {
   const reactFlowWrapper = useRef(null);
+  const minimapRef = useRef(null);
   const [state, { set: setState, undo, redo, canUndo, canRedo }] = useUndo({ nodes: [], edges: [] });
   const { nodes, edges } = state.present;
 
