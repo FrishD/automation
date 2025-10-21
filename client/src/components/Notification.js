@@ -11,7 +11,7 @@ const Notification = ({ message, type, onClear }) => {
         if (onClear) {
           onClear();
         }
-      }, 3000);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [message, onClear]);
@@ -20,7 +20,7 @@ const Notification = ({ message, type, onClear }) => {
     return null;
   }
 
-  const baseClasses = "fixed top-5 right-5 p-4 rounded-lg shadow-lg text-white";
+  const baseClasses = "fixed top-5 left-5 p-4 rounded-lg shadow-lg text-white z-50";
   const typeClasses = {
     success: "bg-green-500",
     error: "bg-red-500",

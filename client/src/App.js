@@ -7,9 +7,11 @@ import ReactFlow, {
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
+  useReactFlow,
 } from 'reactflow';
 import useUndo from 'use-undo';
 import 'reactflow/dist/style.css';
+import Draggable from 'react-draggable';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
 
@@ -25,6 +27,7 @@ import PlayAudioNode from './components/nodes/PlayAudioNode.js';
 import ConfirmationNode from './components/nodes/ConfirmationNode.js';
 import SummaryNode from './components/nodes/SummaryNode.js';
 import Notification from './components/Notification.js';
+import EditableTitle from './components/EditableTitle.js';
 
 
 const API_URL = 'http://localhost:5000/api/flows';
@@ -47,10 +50,22 @@ const nodeTypes = {
 
 const App = () => {
   const reactFlowWrapper = useRef(null);
-  const [nodes, { set: setNodes, undo: undoNodes, redo: redoNodes, canUndo: canUndoNodes, canRedo: canRedoNodes }] = useUndo([]);
-  const [edges, { set: setEdges, undo: undoEdges, redo: redoEdges, canUndo: canUndoEdges, canRedo: canRedoEdges }] = useUndo([]);
-  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes.present));
-  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges.present));
+  const [state, { set: setState, undo, redo, canUndo, canRedo }] = useUndo({ nodes: [], edges: [] });
+  const { nodes, edges } = state.present;
+
+  const onNodesChange = useCallback((changes) => {
+    setState({
+      ...state.present,
+      nodes: applyNodeChanges(changes, nodes),
+    });
+  }, [nodes, setState, state.present]);
+
+  const onEdgesChange = useCallback((changes) => {
+    setState({
+      ...state.present,
+      edges: applyEdgeChanges(changes, edges),
+    });
+  }, [edges, setState, state.present]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
@@ -58,27 +73,83 @@ const App = () => {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [showMinimap, setShowMinimap] = useState(true);
   const [loading, setLoading] = useState(true);
+  const { deleteElements } = useReactFlow();
+
+  const onNodesDelete = useCallback(() => {
+    deleteElements({ nodes, edges });
+  }, [nodes, edges, deleteElements]);
+
+  const onNodeDragStop = useCallback((event, node) => {
+    const parentNode = nodes.find(n =>
+      node.position.x >= n.position.x &&
+      node.position.x <= n.position.x + n.width &&
+      node.position.y >= n.position.y &&
+      node.position.y <= n.position.y + n.height &&
+      n.type === 'loop' &&
+      n.id !== node.id
+    );
+
+    if (parentNode) {
+      setState({
+        ...state.present,
+        nodes: nodes.map(n =>
+          n.id === node.id ? { ...n, parentNode: parentNode.id, extent: 'parent' } : n
+        ),
+      });
+    }
+  }, [nodes, setState, state.present]);
+
+  useEffect(() => {
+    const loopNodes = nodes.filter(n => n.type === 'loop');
+    if (!loopNodes.length) return;
+
+    const updatedNodes = nodes.map(n => {
+      if (n.type === 'loop') {
+        const children = nodes.filter(child => child.parentNode === n.id);
+        if (!children.length) return n;
+
+        const PADDING = 20;
+        const minX = Math.min(...children.map(c => c.position.x)) - PADDING;
+        const minY = Math.min(...children.map(c => c.position.y)) - PADDING;
+        const maxX = Math.max(...children.map(c => c.position.x + c.width)) + PADDING;
+        const maxY = Math.max(...children.map(c => c.position.y + c.height)) + PADDING;
+
+        return {
+          ...n,
+          style: {
+            ...n.style,
+            width: maxX - minX,
+            height: maxY - minY
+          }
+        };
+      }
+      return n;
+    });
+    setState({ ...state.present, nodes: updatedNodes });
+  }, [nodes, setState, state.present]);
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
-    const newNodes = nodes.present.map((node) => {
-      if (node.id === nodeId) {
-        return { ...node, data: { ...node.data, ...newData } };
-      }
-      return node;
+    setState({
+      ...state.present,
+      nodes: nodes.map((node) => {
+        if (node.id === nodeId) {
+          return { ...node, data: { ...node.data, ...newData } };
+        }
+        return node;
+      }),
     });
-    setNodes(newNodes);
-  }, [nodes.present, setNodes]);
+  }, [nodes, setState, state.present]);
 
 
   const nodesWithDataHandlers = useMemo(() => {
-    return nodes.present.map(node => ({
+    return nodes.map(node => ({
       ...node,
       data: {
         ...node.data,
         onChange: (newData) => onNodeDataChange(node.id, newData)
       }
     }));
-  }, [nodes.present, onNodeDataChange]);
+  }, [nodes, onNodeDataChange]);
 
   const createNewFlow = useCallback(async () => {
     try {
@@ -89,14 +160,13 @@ const App = () => {
             edges: [],
         });
         const newFlow = response.data;
-        setNodes(newFlow.nodes);
-        setEdges(newFlow.edges);
+        setState({ nodes: newFlow.nodes, edges: newFlow.edges });
         setFlowName(newFlow.name);
         setCurrentFlowId(newFlow._id);
     } catch (error) {
         console.error("Error creating new flow:", error);
     }
-  }, [setNodes, setEdges, setFlowName, setCurrentFlowId]);
+  }, [setState, setFlowName, setCurrentFlowId]);
 
 
   useEffect(() => {
@@ -106,11 +176,10 @@ const App = () => {
         const response = await axios.get(API_URL);
         if (response.data && response.data.length > 0) {
           const firstFlow = response.data[0];
-          setNodes(firstFlow.nodes || []);
-          setEdges(firstFlow.edges || []);
+          setState({ nodes: firstFlow.nodes || [], edges: firstFlow.edges || [] });
           setFlowName(firstFlow.name || 'Untitled Flow');
           setCurrentFlowId(firstFlow._id);
-          id = firstFlow.nodes.length + 1;
+          id = (firstFlow.nodes || []).length + 1;
         } else {
           await createNewFlow();
         }
@@ -121,15 +190,16 @@ const App = () => {
       }
     };
     fetchInitialFlow();
-  }, [setNodes, setEdges, createNewFlow]);
+  }, [setState, createNewFlow]);
 
   // Effect to update edge labels when a condition node's data changes
   useEffect(() => {
     if (loading) return;
-    setEdges(
-      edges.present.map((edge) => {
+    setState({
+      ...state.present,
+      edges: edges.map((edge) => {
         if (edge.sourceHandle) {
-          const sourceNode = nodes.present.find((node) => node.id === edge.source);
+          const sourceNode = nodes.find((node) => node.id === edge.source);
           if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
             const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
             edge.label = keyword || `[Connect to save keyword]`;
@@ -137,20 +207,20 @@ const App = () => {
         }
         return edge;
       })
-    );
-  }, [nodes.present, setEdges, loading]);
+    });
+  }, [nodes, edges, setState, state.present, loading]);
 
   const onConnect = useCallback((params) => {
     let newEdge = { ...params };
-    const sourceNode = nodes.present.find(node => node.id === params.source);
+    const sourceNode = nodes.find(node => node.id === params.source);
     if (sourceNode && params.sourceHandle) {
         if (sourceNode.data.conditions && sourceNode.data.conditions[params.sourceHandle]) {
             const keyword = sourceNode.data.conditions[params.sourceHandle].keyword;
             newEdge.label = keyword || `[Connect to save keyword]`;
         }
     }
-    setEdges(addEdge(newEdge, edges.present));
-    }, [nodes.present, setEdges, edges.present]);
+    setState({ ...state.present, edges: addEdge(newEdge, edges) });
+    }, [nodes, edges, setState, state.present]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -207,9 +277,9 @@ const App = () => {
         data: initialData,
       };
 
-      setNodes(nodes.present.concat(newNode));
+      setState({ ...state.present, nodes: nodes.concat(newNode) });
     },
-    [reactFlowInstance, nodes.present, setNodes],
+    [reactFlowInstance, nodes, setState, state.present],
   );
 
   const onPaneContextMenu = (event) => {
@@ -285,14 +355,14 @@ const App = () => {
       position,
       data: initialData,
     };
-    setNodes(nodes.present.concat(newNode));
+    setState({ ...state.present, nodes: nodes.concat(newNode) });
     setMenu(null);
   };
 
   const saveFlow = async () => {
     if (!currentFlowId) return;
     try {
-        const nodesToSave = nodes.present.map(({ data, ...node }) => {
+        const nodesToSave = nodes.map(({ data, ...node }) => {
             const { onChange, ...restData } = data;
             return { ...node, data: restData };
         });
@@ -300,7 +370,7 @@ const App = () => {
         await axios.put(`${API_URL}/${currentFlowId}`, {
             name: flowName,
             nodes: nodesToSave,
-            edges: edges.present,
+            edges: edges,
         });
         setNotification({ message: 'Flow saved!', type: 'success' });
     } catch (error) {
@@ -327,19 +397,14 @@ const App = () => {
             <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
               <div className="flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
                 <div className="flex items-center gap-1">
-                  <button onClick={() => { undoNodes(); undoEdges(); }} disabled={!canUndoNodes || !canUndoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                  <button onClick={undo} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">undo</span>
                   </button>
-                  <button onClick={() => { redoNodes(); redoEdges(); }} disabled={!canRedoNodes || !canRedoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                  <button onClick={redo} disabled={!canRedo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">redo</span>
                   </button>
                 </div>
-                <input
-                  type="text"
-                  value={flowName}
-                  onChange={(e) => setFlowName(e.target.value)}
-                  className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
-                />
+                <EditableTitle value={flowName} onChange={setFlowName} />
                 <div className="flex items-center gap-1.5 mr-1">
                   <button className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
                     <span className="material-symbols-outlined text-base">upload</span>
@@ -356,7 +421,7 @@ const App = () => {
               </div>
               <ReactFlow
                 nodes={nodesWithDataHandlers}
-                edges={edges.present}
+                edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
@@ -366,75 +431,58 @@ const App = () => {
                 onPaneContextMenu={onPaneContextMenu}
                 onPaneDoubleClick={onPaneDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
+                onNodesDelete={onNodesDelete}
+                onNodeDragStop={onNodeDragStop}
+                deleteKeyCode={'Backspace'}
                 fitView
                 nodeTypes={nodeTypes}
               >
                 <Background variant="dots" gap={20} size={1} />
                 <Controls className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1" />
-                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />}
+                <Draggable
+                  defaultPosition={JSON.parse(localStorage.getItem('minimapPos')) || {x: window.innerWidth - 1000, y: 20}}
+                  onStop={(e, data) => localStorage.setItem('minimapPos', JSON.stringify({x: data.x, y: data.y}))}
+                  handle=".minimap-handle"
+                >
+                  <div className={`absolute z-20 transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="minimap-handle cursor-move h-6 w-full bg-slate-200 dark:bg-slate-700 rounded-t-lg"></div>
+                    <MiniMap className="w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-b-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden" />
+                  </div>
+                </Draggable>
               </ReactFlow>
               {menu && (
                 <div
-                  className="absolute z-30 w-56 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-2"
+                  className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
                   style={{ top: menu.top, left: menu.left }}
                   onClick={() => setMenu(null)}
                 >
                   {menu.data.node ? (
                     <>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">edit</span>
-                        <span>Edit Properties</span>
-                      </button>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">content_copy</span>
-                        <span>Duplicate Block</span>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
+                        <span className="material-symbols-outlined text-base text-muted-light dark:text-muted-dark">content_copy</span>
+                        <span>Duplicate</span>
                       </button>
                       <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                        <span>Delete Block</span>
+                      <button onClick={onNodesDelete} className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
+                        <span className="material-symbols-outlined text-base">delete</span>
+                        <span>Delete</span>
                       </button>
                     </>
                   ) : (
                     <>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('speak')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">record_voice_over</span>
-                        <span>Speak</span>
-                      </button>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('listen')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hearing</span>
-                        <span>Listen</span>
-                      </button>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('condition')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">call_split</span>
-                        <span>If</span>
-                      </button>
+                      <p className="px-3 py-1 text-xs font-semibold text-muted-light dark:text-muted-dark">Add Node</p>
                       <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('variable')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">data_object</span>
-                        <span>Variable</span>
-                      </button>
-                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('wait')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hourglass_empty</span>
-                        <span>Wait</span>
-                      </button>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('play_audio')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">volume_up</span>
-                        <span>Play Audio</span>
-                      </button>
-                       <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('loop')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">replay</span>
-                        <span>Loop</span>
-                      </button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('speak')}>Speak</button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('listen')}>Listen</button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('condition')}>If</button>
+                       <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('variable')}>Variable</button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('wait')}>Wait</button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('play_audio')}>Play Audio</button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('loop')}>Loop</button>
                       <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('confirmation')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">rule</span>
-                        <span>Confirmation</span>
-                      </button>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('summary')}>
-                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">summarize</span>
-                        <span>Summary</span>
-                      </button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('confirmation')}>Confirmation</button>
+                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('summary')}>Summary</button>
                     </>
                   )}
                 </div>
