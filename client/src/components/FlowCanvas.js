@@ -16,9 +16,6 @@ const FlowCanvas = ({
   onInit,
   onDrop,
   onDragOver,
-  onPaneContextMenu,
-  onPaneDoubleClick,
-  onNodeContextMenu,
   onAddNode,
   nodeTypes,
   showMinimap

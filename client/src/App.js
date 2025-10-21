@@ -114,12 +114,6 @@ const App = () => {
     setState({ ...state.present, nodes: [...nodes, newNode] });
   }, [nodes, setState, state.present]);
 
-  const { deleteElements } = useReactFlow();
-
-  const onNodesDelete = useCallback(() => {
-    deleteElements({ nodes, edges });
-  }, [nodes, edges, deleteElements]);
-
   const onNodeDragStop = useCallback((event, node) => {
     const parentNode = nodes.find(n =>
       node.position.x >= n.position.x &&
