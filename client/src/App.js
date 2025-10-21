@@ -7,7 +7,10 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from 'reactflow';
+import useUndo from 'use-undo';
 import 'reactflow/dist/style.css';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
@@ -23,20 +26,39 @@ import LoopNode from './components/nodes/LoopNode.js';
 import PlayAudioNode from './components/nodes/PlayAudioNode.js';
 import ConfirmationNode from './components/nodes/ConfirmationNode.js';
 import SummaryNode from './components/nodes/SummaryNode.js';
+import Notification from './components/Notification.js';
 
 
 const API_URL = 'http://localhost:5000/api/flows';
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
+const nodeTypes = {
+  start: StartNode,
+  speak: SpeakNode,
+  listen: ListenNode,
+  condition: ConditionNode,
+  end: EndNode,
+  variable: VariableNode,
+  wait: WaitNode,
+  loop: LoopNode,
+  play_audio: PlayAudioNode,
+  confirmation: ConfirmationNode,
+  summary: SummaryNode,
+};
+
 const App = () => {
   const reactFlowWrapper = useRef(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, { set: setNodes, undo: undoNodes, redo: redoNodes, canUndo: canUndoNodes, canRedo: canRedoNodes }] = useUndo([]);
+  const [edges, { set: setEdges, undo: undoEdges, redo: redoEdges, canUndo: canUndoEdges, canRedo: canRedoEdges }] = useUndo([]);
+  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
+  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
   const [menu, setMenu] = useState(null);
+  const [notification, setNotification] = useState({ message: '', type: '' });
+  const [showMinimap, setShowMinimap] = useState(true);
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
     setNodes((nds) =>
@@ -48,20 +70,6 @@ const App = () => {
       })
     );
   }, [setNodes]);
-
-  const nodeTypes = useMemo(() => ({
-    start: StartNode,
-    speak: SpeakNode,
-    listen: ListenNode,
-    condition: ConditionNode,
-    end: EndNode,
-    variable: VariableNode,
-    wait: WaitNode,
-    loop: LoopNode,
-    play_audio: PlayAudioNode,
-    confirmation: ConfirmationNode,
-    summary: SummaryNode,
-  }), []);
 
   const nodesWithDataHandlers = useMemo(() => {
     return nodes.map(node => ({
@@ -89,7 +97,7 @@ const App = () => {
     } catch (error) {
         console.error("Error creating new flow:", error);
     }
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, setFlowName, setCurrentFlowId]);
 
 
   useEffect(() => {
@@ -174,13 +182,24 @@ const App = () => {
     [reactFlowInstance, setNodes],
   );
 
-  const onPaneDoubleClick = (event) => {
+  const onPaneContextMenu = (event) => {
+    event.preventDefault();
     const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: getId(),
       top: event.clientY,
       left: event.clientX,
       data: { position }
+    });
+  };
+
+  const onNodeContextMenu = (event, node) => {
+    event.preventDefault();
+    setMenu({
+      id: node.id,
+      top: event.clientY,
+      left: event.clientX,
+      data: { node }
     });
   };
 
@@ -199,7 +218,7 @@ const App = () => {
   const saveFlow = async () => {
     if (!currentFlowId) return;
     try {
-        const nodesToSave = nodes.map(({ data, ...node }) => {
+        const nodesToSave = nodes.present.map(({ data, ...node }) => {
             const { onChange, ...restData } = data;
             return { ...node, data: restData };
         });
@@ -207,17 +226,18 @@ const App = () => {
         await axios.put(`${API_URL}/${currentFlowId}`, {
             name: flowName,
             nodes: nodesToSave,
-            edges: edges,
+            edges: edges.present,
         });
-        alert('Flow saved!');
+        setNotification({ message: 'Flow saved!', type: 'success' });
     } catch (error) {
         console.error("Error saving flow:", error);
-        alert('Error saving flow.');
+        setNotification({ message: 'Error saving flow.', type: 'error' });
     }
   };
 
   return (
     <div className="flex h-screen">
+      <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
       <ReactFlowProvider>
         <Sidebar />
         <main className="flex-1 bg-background-light dark:bg-background-dark p-6">
@@ -225,14 +245,19 @@ const App = () => {
             <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
               <div className="flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
                 <div className="flex items-center gap-1">
-                  <button className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <button onClick={() => { undoNodes(); undoEdges(); }} disabled={!canUndoNodes || !canUndoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">undo</span>
                   </button>
-                  <button className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <button onClick={() => { redoNodes(); redoEdges(); }} disabled={!canRedoNodes || !canRedoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">redo</span>
                   </button>
                 </div>
-                <h2 className="text-sm font-medium text-on-surface-light dark:text-on-surface-dark">{flowName}</h2>
+                <input
+                  type="text"
+                  value={flowName}
+                  onChange={(e) => setFlowName(e.target.value)}
+                  className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
+                />
                 <div className="flex items-center gap-1.5 mr-1">
                   <button className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
                     <span className="material-symbols-outlined text-base">upload</span>
@@ -241,6 +266,9 @@ const App = () => {
                   <button onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
                     <span className="material-symbols-outlined text-base">save</span>
                     <span>Save</span>
+                  </button>
+                  <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-outlined text-lg">map</span>
                   </button>
                 </div>
               </div>
@@ -253,13 +281,14 @@ const App = () => {
                 onInit={setReactFlowInstance}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
-                onPaneDoubleClick={onPaneDoubleClick}
+                onPaneContextMenu={onPaneContextMenu}
+                onNodeContextMenu={onNodeContextMenu}
                 fitView
                 nodeTypes={nodeTypes}
               >
                 <Background variant="dots" gap={20} size={1} />
                 <Controls className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1" />
-                <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />
+                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />}
               </ReactFlow>
               {menu && (
                 <div
@@ -267,18 +296,38 @@ const App = () => {
                   style={{ top: menu.top, left: menu.left }}
                   onClick={() => setMenu(null)}
                 >
-                  <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('speak')}>
-                    <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">record_voice_over</span>
-                    <span>Speak</span>
-                  </a>
-                  <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('listen')}>
-                    <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hearing</span>
-                    <span>Listen</span>
-                  </a>
-                  <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('condition')}>
-                    <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">call_split</span>
-                    <span>If</span>
-                  </a>
+                  {menu.data.node ? (
+                    <>
+                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">edit</span>
+                        <span>Edit Properties</span>
+                      </a>
+                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">content_copy</span>
+                        <span>Duplicate Block</span>
+                      </a>
+                      <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10" href="#">
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                        <span>Delete Block</span>
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('speak')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">record_voice_over</span>
+                        <span>Speak</span>
+                      </a>
+                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('listen')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hearing</span>
+                        <span>Listen</span>
+                      </a>
+                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('condition')}>
+                        <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">call_split</span>
+                        <span>If</span>
+                      </a>
+                    </>
+                  )}
                 </div>
               )}
             </div>

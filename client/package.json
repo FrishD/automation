@@ -12,6 +12,7 @@
     "react-dom": "^19.2.0",
     "react-scripts": "^5.0.1",
     "reactflow": "^11.11.4",
+    "use-undo": "^1.1.1",
     "web-vitals": "^5.1.0"
   },
   "scripts": {
