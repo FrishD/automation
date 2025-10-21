@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import ReactFlow, {
+import {
   ReactFlowProvider,
-  Controls,
-  Background,
-  MiniMap,
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
-  useReactFlow,
 } from 'reactflow';
 import useUndo from 'use-undo';
 import 'reactflow/dist/style.css';
-import Draggable from 'react-draggable';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
 
@@ -51,7 +46,6 @@ const nodeTypes = {
 
 const App = () => {
   const reactFlowWrapper = useRef(null);
-  const minimapRef = useRef(null);
   const [state, { set: setState, undo, redo, canUndo, canRedo }] = useUndo({ nodes: [], edges: [] });
   const { nodes, edges } = state.present;
 
@@ -75,6 +69,12 @@ const App = () => {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [showMinimap, setShowMinimap] = useState(true);
   const [loading, setLoading] = useState(true);
+  const { deleteElements } = useReactFlow();
+
+  const onNodesDelete = useCallback(() => {
+    deleteElements({ nodes, edges });
+  }, [nodes, edges, deleteElements]);
+
   const onNodeDragStop = useCallback((event, node) => {
     const parentNode = nodes.find(n =>
       node.position.x >= n.position.x &&
@@ -427,6 +427,7 @@ const App = () => {
                 onPaneContextMenu={onPaneContextMenu}
                 onPaneDoubleClick={onPaneDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
+                onNodesDelete={onNodesDelete}
                 onNodeDragStop={onNodeDragStop}
                 nodeTypes={nodeTypes}
                 showMinimap={showMinimap}

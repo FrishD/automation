@@ -19,15 +19,11 @@ const FlowCanvas = ({
   onPaneContextMenu,
   onPaneDoubleClick,
   onNodeContextMenu,
+  onNodesDelete,
   nodeTypes,
   showMinimap
 }) => {
-  const { deleteElements } = useReactFlow();
   const minimapRef = useRef(null);
-
-  const onNodesDelete = useCallback(() => {
-    deleteElements({ nodes, edges });
-  }, [nodes, edges, deleteElements]);
 
   return (
     <ReactFlow
