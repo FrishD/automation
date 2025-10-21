@@ -4,8 +4,6 @@ import ReactFlow, {
   Controls,
   Background,
   MiniMap,
-  useNodesState,
-  useEdgesState,
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
@@ -298,34 +296,34 @@ const App = () => {
                 >
                   {menu.data.node ? (
                     <>
-                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">edit</span>
                         <span>Edit Properties</span>
-                      </a>
-                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">content_copy</span>
                         <span>Duplicate Block</span>
-                      </a>
+                      </button>
                       <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10" href="#">
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
                         <span className="material-symbols-outlined text-lg">delete</span>
                         <span>Delete Block</span>
-                      </a>
+                      </button>
                     </>
                   ) : (
                     <>
-                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('speak')}>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('speak')}>
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">record_voice_over</span>
                         <span>Speak</span>
-                      </a>
-                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('listen')}>
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('listen')}>
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hearing</span>
                         <span>Listen</span>
-                      </a>
-                      <a className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700" href="#" onClick={() => onSelect('condition')}>
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('condition')}>
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">call_split</span>
                         <span>If</span>
-                      </a>
+                      </button>
                     </>
                   )}
                 </div>
