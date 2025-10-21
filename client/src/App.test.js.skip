@@ -1,0 +1,28 @@
+import { render, screen } from '@testing-library/react';
+import App from './App';
+
+// Mock the 'use-undo' library to handle its default export correctly in the Jest environment.
+// This prevents the 'undefined is not iterable' error during testing.
+jest.mock('use-undo', () => ({
+  __esModule: true, // This property is needed to mock ES modules with a default export.
+  default: jest.fn(initialState => [
+    // First part of the tuple: the state object.
+    { present: initialState },
+    // Second part of the tuple: an object with mock action functions.
+    {
+      set: jest.fn(),
+      undo: jest.fn(),
+      redo: jest.fn(),
+      canUndo: false,
+      canRedo: false,
+    },
+  ]),
+}));
+
+
+test('renders the sidebar with blocks', () => {
+  render(<App />);
+  // Verify that the main sidebar title "Blocks" is present in the document.
+  const sidebarTitle = screen.getByText(/Blocks/i);
+  expect(sidebarTitle).toBeInTheDocument();
+});
