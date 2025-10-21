@@ -66,10 +66,54 @@ const App = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
-  const [menu, setMenu] = useState(null);
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [showMinimap, setShowMinimap] = useState(true);
   const [loading, setLoading] = useState(true);
+
+  const onAddNode = useCallback((type, position) => {
+    let initialData = { label: `${type} node` };
+      switch (type) {
+        case 'speak':
+          initialData.text = 'Agent says...';
+          break;
+        case 'condition':
+          initialData.conditions = [{ keyword: '' }];
+          break;
+        case 'wait':
+          initialData.duration = 1;
+          initialData.units = 'seconds';
+          break;
+        case 'variable':
+          initialData.variableAction = 'set';
+          initialData.variableName = 'myVar';
+          initialData.variableValue = 'value';
+          break;
+        case 'play_audio':
+          initialData.url = 'https://example.com/audio.mp3';
+          break;
+        case 'confirmation':
+          initialData.text = 'Are you sure?';
+          break;
+        case 'summary':
+          initialData.text = 'Thank you for calling.';
+          initialData.enableRating = false;
+          break;
+        case 'loop':
+            initialData.loopType = 'count';
+            initialData.count = 2;
+            break;
+        default:
+          break;
+      }
+    const newNode = {
+      id: `dndnode_${+new Date()}`,
+      type,
+      position,
+      data: initialData,
+    };
+    setState({ ...state.present, nodes: [...nodes, newNode] });
+  }, [nodes, setState, state.present]);
+
   const { deleteElements } = useReactFlow();
 
   const onNodesDelete = useCallback(() => {
@@ -279,82 +323,6 @@ const App = () => {
     [reactFlowInstance, nodes, setState, state.present],
   );
 
-  const onPaneContextMenu = (event) => {
-    event.preventDefault();
-    const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    setMenu({
-      id: getId(),
-      top: event.clientY,
-      left: event.clientX,
-      data: { position }
-    });
-  };
-
-  const onPaneDoubleClick = (event) => {
-    const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    setMenu({
-      id: getId(),
-      top: event.clientY,
-      left: event.clientX,
-      data: { position }
-    });
-  };
-
-  const onNodeContextMenu = (event, node) => {
-    event.preventDefault();
-    setMenu({
-      id: node.id,
-      top: event.clientY,
-      left: event.clientX,
-      data: { node }
-    });
-  };
-
-  const onSelect = (type) => {
-    const { id, data: { position } } = menu;
-     let initialData = { label: `${type} node` };
-      switch (type) {
-        case 'speak':
-          initialData.text = 'Agent says...';
-          break;
-        case 'condition':
-          initialData.conditions = [{ keyword: '' }];
-          break;
-        case 'wait':
-          initialData.duration = 1;
-          initialData.units = 'seconds';
-          break;
-        case 'variable':
-          initialData.variableAction = 'set';
-          initialData.variableName = 'myVar';
-          initialData.variableValue = 'value';
-          break;
-        case 'play_audio':
-          initialData.url = 'https://example.com/audio.mp3';
-          break;
-        case 'confirmation':
-          initialData.text = 'Are you sure?';
-          break;
-        case 'summary':
-          initialData.text = 'Thank you for calling.';
-          initialData.enableRating = false;
-          break;
-        case 'loop':
-            initialData.loopType = 'count';
-            initialData.count = 2;
-            break;
-        default:
-          break;
-      }
-    const newNode = {
-      id,
-      type,
-      position,
-      data: initialData,
-    };
-    setState({ ...state.present, nodes: nodes.concat(newNode) });
-    setMenu(null);
-  };
 
   const saveFlow = async () => {
     if (!currentFlowId) return;
@@ -425,51 +393,11 @@ const App = () => {
                 onInit={setReactFlowInstance}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
-                onPaneContextMenu={onPaneContextMenu}
-                onPaneDoubleClick={onPaneDoubleClick}
-                onNodeContextMenu={onNodeContextMenu}
-                onNodesDelete={onNodesDelete}
+                onAddNode={onAddNode}
                 onNodeDragStop={onNodeDragStop}
                 nodeTypes={nodeTypes}
                 showMinimap={showMinimap}
               />
-              {menu && (
-                <div
-                  className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
-                  style={{ top: menu.top, left: menu.left }}
-                  onClick={() => setMenu(null)}
-                >
-                  {menu.data.node ? (
-                    <>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
-                        <span className="material-symbols-outlined text-base text-muted-light dark:text-muted-dark">content_copy</span>
-                        <span>Duplicate</span>
-                      </button>
-                      <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <button onClick={onNodesDelete} className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
-                        <span className="material-symbols-outlined text-base">delete</span>
-                        <span>Delete</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="px-3 py-1 text-xs font-semibold text-muted-light dark:text-muted-dark">Add Node</p>
-                      <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('speak')}>Speak</button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('listen')}>Listen</button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('condition')}>If</button>
-                       <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('variable')}>Variable</button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('wait')}>Wait</button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('play_audio')}>Play Audio</button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('loop')}>Loop</button>
-                      <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('confirmation')}>Confirmation</button>
-                      <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('summary')}>Summary</button>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </main>

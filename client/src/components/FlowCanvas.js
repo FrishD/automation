@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -19,15 +19,49 @@ const FlowCanvas = ({
   onPaneContextMenu,
   onPaneDoubleClick,
   onNodeContextMenu,
-  onNodesDelete,
+  onAddNode,
   nodeTypes,
   showMinimap
 }) => {
   const minimapRef = useRef(null);
+  const { deleteElements, screenToFlowPosition } = useReactFlow();
+  const [menu, setMenu] = useState(null);
+
+  const onNodesDelete = useCallback(() => {
+    deleteElements({ nodes, edges });
+  }, [nodes, edges, deleteElements]);
+
+  const onPaneContextMenu = useCallback((event) => {
+    event.preventDefault();
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    setMenu({
+      id: `dndnode_${+new Date()}`,
+      top: event.clientY,
+      left: event.clientX,
+      data: { position }
+    });
+  }, [screenToFlowPosition]);
+
+  const onNodeContextMenu = useCallback((event, node) => {
+    event.preventDefault();
+    setMenu({
+      id: node.id,
+      top: event.clientY,
+      left: event.clientX,
+      data: { node }
+    });
+  }, []);
+
+  const onSelect = (type) => {
+    const { data: { position } } = menu;
+    onAddNode(type, position);
+    setMenu(null);
+  };
 
   return (
-    <ReactFlow
-      nodes={nodes}
+    <>
+      <ReactFlow
+        nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
@@ -57,6 +91,44 @@ const FlowCanvas = ({
         </div>
       </Draggable>
     </ReactFlow>
+    {menu && (
+      <div
+        className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
+        style={{ top: menu.top, left: menu.left }}
+        onClick={() => setMenu(null)}
+      >
+        {menu.data.node ? (
+          <>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
+              <span className="material-symbols-outlined text-base text-muted-light dark:text-muted-dark">content_copy</span>
+              <span>Duplicate</span>
+            </button>
+            <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+            <button onClick={onNodesDelete} className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
+              <span className="material-symbols-outlined text-base">delete</span>
+              <span>Delete</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="px-3 py-1 text-xs font-semibold text-muted-light dark:text-muted-dark">Add Node</p>
+            <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('speak')}>Speak</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('listen')}>Listen</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('condition')}>If</button>
+            <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('variable')}>Variable</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('wait')}>Wait</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('play_audio')}>Play Audio</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('loop')}>Loop</button>
+            <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('confirmation')}>Confirmation</button>
+            <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('summary')}>Summary</button>
+          </>
+        )}
+      </div>
+    )}
+    </>
   );
 };
 
