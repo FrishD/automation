@@ -127,9 +127,12 @@ class ConversationEngine:
     def _replace_variables(self, text):
         """Replaces {variable_name} placeholders with stored variable values."""
         for var_name, var_value in self.variables.items():
-            # Use a regex to replace {var_name} to avoid replacing parts of words
-            # Ensure var_value is a string
-            text = re.sub(r'\{' + var_name + r'\}', str(var_value or ''), text)
+            # Use a robust regex to replace {  var_name  } placeholders
+            # It handles whitespace and escapes the variable name for safety
+            pattern = r'\{\s*' + re.escape(var_name.strip()) + r'\s*\}'
+            # Ensure the replacement value is a string
+            replacement = str(var_value if var_value is not None else '')
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
         return text
 
     def _find_next_node_id(self, source_node_id, source_handle=None):

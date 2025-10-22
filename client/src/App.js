@@ -176,10 +176,13 @@ const App = () => {
           initialData.text = 'Agent says...';
       }
 
+      const children = nodes.present.filter(n => n.parentNode === parentNode?.id);
+      const childCount = children.length;
+
       const newNode = {
         id: getId(),
         type,
-        position: { x: 20, y: 120 }, // Default position inside parent
+        position: { x: 20, y: 120 + (childCount * 50) }, // Position children below each other
         data: initialData,
         parentNode: parentNode ? parentNode.id : undefined,
         extent: parentNode ? 'parent' : undefined,
@@ -190,7 +193,19 @@ const App = () => {
         newNode.position = position;
       }
 
-      setNodes(nodes.present.concat(newNode));
+      const newNodes = nodes.present.concat(newNode);
+
+      if (parentNode) {
+        const parentIndex = newNodes.findIndex(n => n.id === parentNode.id);
+        if (parentIndex > -1) {
+          newNodes[parentIndex] = {
+            ...newNodes[parentIndex],
+            height: 200 + (childCount + 1) * 50,
+          };
+        }
+      }
+
+      setNodes(newNodes);
     },
     [reactFlowInstance, nodes.present, setNodes],
   );
@@ -205,6 +220,9 @@ const App = () => {
       (n.type === 'listen' || n.type === 'loop')
     );
 
+    const children = nodes.present.filter(n => n.parentNode === (parentNode ? parentNode.id : node.parentNode));
+    const childCount = children.length;
+
     setNodes(nodes.present.map(n => {
       if (n.id === node.id) {
         const isChild = !!parentNode;
@@ -212,7 +230,13 @@ const App = () => {
           ...n,
           parentNode: isChild ? parentNode.id : undefined,
           extent: isChild ? 'parent' : undefined,
-          position: isChild ? { x: 20, y: n.position.y } : n.position, // Reset x, keep y
+          position: isChild ? { x: 20, y: 120 + (childCount * 50) } : n.position, // Position children below each other
+        };
+      }
+      if (parentNode && n.id === parentNode.id) {
+        return {
+          ...n,
+          height: 200 + (childCount * 50),
         };
       }
       return n;
