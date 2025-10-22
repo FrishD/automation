@@ -161,6 +161,14 @@ const App = () => {
 
       const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
 
+      const targetNode = nodes.present.find(node =>
+        position.x >= node.position.x &&
+        position.x <= node.position.x + node.width &&
+        position.y >= node.position.y &&
+        position.y <= node.position.y + node.height &&
+        (node.type === 'listen' || node.type === 'loop') // Add other parent node types if needed
+      );
+
       let initialData = { label: `${type} node` };
       if (type === 'condition') {
           initialData.conditions = [{ keyword: '' }];
@@ -173,12 +181,36 @@ const App = () => {
         type,
         position,
         data: initialData,
+        parentNode: targetNode ? targetNode.id : undefined,
+        extent: targetNode ? 'parent' : undefined,
       };
 
       setNodes(nodes.present.concat(newNode));
     },
     [reactFlowInstance, nodes.present, setNodes],
   );
+
+  const onNodeDragStop = useCallback((_, node) => {
+    const targetNode = nodes.present.find(n =>
+      node.position.x >= n.position.x &&
+      node.position.x <= n.position.x + n.width &&
+      node.position.y >= n.position.y &&
+      node.position.y <= n.position.y + n.height &&
+      n.id !== node.id &&
+      (n.type === 'listen' || n.type === 'loop')
+    );
+
+    setNodes(nodes.present.map(n => {
+      if (n.id === node.id) {
+        return {
+          ...n,
+          parentNode: targetNode ? targetNode.id : undefined,
+          extent: targetNode ? 'parent' : undefined,
+        };
+      }
+      return n;
+    }));
+  }, [nodes.present, setNodes]);
 
   const onPaneContextMenu = (event) => {
     event.preventDefault();
@@ -297,6 +329,7 @@ const App = () => {
                 onInit={setReactFlowInstance}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
+                onNodeDragStop={onNodeDragStop}
                 onPaneContextMenu={onPaneContextMenu}
                 onPaneDoubleClick={onPaneDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}

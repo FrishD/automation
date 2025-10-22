@@ -12,7 +12,10 @@ const ListenNode = ({ data, id }) => {
   };
 
   return (
-    <div className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64">
+    <div
+      className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border-2 border-slate-200 dark:border-slate-700 z-0 w-64"
+      style={{ minHeight: '150px' }} // Set a minimum height to allow dropping
+    >
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-primary text-2xl">hearing</span>
         <span className="font-semibold text-sm">Listen</span>
