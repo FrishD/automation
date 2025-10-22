@@ -51,18 +51,65 @@ const App = () => {
   const { nodes, edges } = state.present;
 
   const onNodesChange = useCallback((changes) => {
-    setState({
-      ...state.present,
-      nodes: applyNodeChanges(changes, nodes),
+    const newNodes = applyNodeChanges(changes, nodes);
+    const loopNodes = newNodes.filter(n => n.type === 'loop');
+    if (!loopNodes.length) {
+        setState({ ...state.present, nodes: newNodes });
+        return;
+    }
+
+    const updatedNodes = newNodes.map(n => {
+        if (n.type === 'loop') {
+            const children = newNodes.filter(child => child.parentNode === n.id);
+            if (!children.length) return n;
+
+            const PADDING = 20;
+            const minX = Math.min(...children.map(c => c.position.x)) - PADDING;
+            const minY = Math.min(...children.map(c => c.position.y)) - PADDING;
+            const maxX = Math.max(...children.map(c => c.position.x + c.width)) + PADDING;
+            const maxY = Math.max(...children.map(c => c.position.y + c.height)) + PADDING;
+
+            const newWidth = maxX - minX;
+            const newHeight = maxY - minY;
+
+            if (n.style?.width !== newWidth || n.style?.height !== newHeight) {
+                return {
+                    ...n,
+                    style: {
+                        ...n.style,
+                        width: newWidth,
+                        height: newHeight
+                    }
+                };
+            }
+        }
+        return n;
     });
-  }, [nodes, setState, state.present]);
+
+    setState({ ...state.present, nodes: updatedNodes });
+}, [nodes, setState, state.present]);
 
   const onEdgesChange = useCallback((changes) => {
+    const newEdges = applyEdgeChanges(changes, edges);
+    const updatedEdges = newEdges.map((edge) => {
+      if (edge.sourceHandle) {
+        const sourceNode = nodes.find((node) => node.id === edge.source);
+        if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
+          const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
+          const newLabel = keyword || `[Connect to save keyword]`;
+          if (edge.label !== newLabel) {
+            return { ...edge, label: newLabel };
+          }
+        }
+      }
+      return edge;
+    });
+
     setState({
       ...state.present,
-      edges: applyEdgeChanges(changes, edges),
+      edges: updatedEdges,
     });
-  }, [edges, setState, state.present]);
+  }, [nodes, edges, setState, state.present]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
@@ -135,43 +182,6 @@ const App = () => {
   }, [nodes, setState, state.present]);
 
 
-  useEffect(() => {
-    const loopNodes = nodes.filter(n => n.type === 'loop');
-    if (!loopNodes.length) return;
-
-    const updatedNodes = nodes.map(n => {
-      if (n.type === 'loop') {
-        const children = nodes.filter(child => child.parentNode === n.id);
-        if (!children.length) return n;
-
-        const PADDING = 20;
-        const minX = Math.min(...children.map(c => c.position.x)) - PADDING;
-        const minY = Math.min(...children.map(c => c.position.y)) - PADDING;
-        const maxX = Math.max(...children.map(c => c.position.x + c.width)) + PADDING;
-        const maxY = Math.max(...children.map(c => c.position.y + c.height)) + PADDING;
-
-        const newWidth = maxX - minX;
-        const newHeight = maxY - minY;
-
-        if (n.style?.width !== newWidth || n.style?.height !== newHeight) {
-          return {
-            ...n,
-            style: {
-              ...n.style,
-              width: newWidth,
-              height: newHeight
-            }
-          };
-        }
-      }
-      return n;
-    });
-
-    if (JSON.stringify(nodes) !== JSON.stringify(updatedNodes)) {
-      setState({ ...state.present, nodes: updatedNodes });
-    }
-  }, [nodes, setState, state.present]);
-
   const onNodeDataChange = useCallback((nodeId, newData) => {
     setState({
       ...state.present,
@@ -236,32 +246,6 @@ const App = () => {
     fetchInitialFlow();
   }, [setState, createNewFlow]);
 
-
-  // Effect to update edge labels when a condition node's data changes
-  useEffect(() => {
-    if (loading) return;
-
-    const updatedEdges = edges.map((edge) => {
-      if (edge.sourceHandle) {
-        const sourceNode = nodes.find((node) => node.id === edge.source);
-        if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
-          const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
-          const newLabel = keyword || `[Connect to save keyword]`;
-          if (edge.label !== newLabel) {
-            return { ...edge, label: newLabel };
-          }
-        }
-      }
-      return edge;
-    });
-
-    if (JSON.stringify(edges) !== JSON.stringify(updatedEdges)) {
-      setState({
-        ...state.present,
-        edges: updatedEdges,
-      });
-    }
-  }, [nodes, edges, setState, state.present, loading]);
 
   const onConnect = useCallback((params) => {
     let newEdge = { ...params };
