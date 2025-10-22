@@ -1,8 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import App from './App';
+import axios from 'axios';
 
-test('renders the sidebar with blocks', () => {
+jest.mock('axios');
+
+test('renders the sidebar with blocks', async () => {
+  axios.get.mockResolvedValue({ data: [] });
+  axios.post.mockResolvedValue({ data: { nodes: [], edges: [] } });
   render(<App />);
-  const sidebarTitle = screen.getByText(/Blocks/i);
-  expect(sidebarTitle).toBeInTheDocument();
+  await waitFor(() => {
+    const sidebarTitle = screen.getByText(/Blocks/i);
+    expect(sidebarTitle).toBeInTheDocument();
+  });
 });

@@ -5,7 +5,6 @@ import ReactFlow, {
   MiniMap,
   useReactFlow,
 } from 'reactflow';
-import Draggable from 'react-draggable';
 
 const FlowCanvas = ({
   nodes,
@@ -30,24 +29,13 @@ const FlowCanvas = ({
 
   const onPaneContextMenu = useCallback((event) => {
     event.preventDefault();
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: `dndnode_${+new Date()}`,
       top: event.clientY,
       left: event.clientX,
-      data: { position }
+      data: { position: { x: event.clientX, y: event.clientY } }
     });
-  }, [screenToFlowPosition]);
-
-  const onPaneDoubleClick = useCallback((event) => {
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    setMenu({
-      id: `dndnode_${+new Date()}`,
-      top: event.clientY,
-      left: event.clientX,
-      data: { position }
-    });
-  }, [screenToFlowPosition]);
+  }, []);
 
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
@@ -77,7 +65,6 @@ const FlowCanvas = ({
       onDrop={onDrop}
       onDragOver={onDragOver}
       onPaneContextMenu={onPaneContextMenu}
-      onPaneClick={onPaneDoubleClick}
       onNodeContextMenu={onNodeContextMenu}
       onNodesDelete={onNodesDelete}
       deleteKeyCode={'Backspace'}
@@ -86,26 +73,17 @@ const FlowCanvas = ({
     >
       <Background variant="dots" gap={20} size={1} />
       <Controls className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1" />
-      <Draggable
-        nodeRef={minimapRef}
-        defaultPosition={JSON.parse(localStorage.getItem('minimapPos')) || { x: 20, y: 20 }}
-        onStop={(e, data) => localStorage.setItem('minimapPos', JSON.stringify({x: data.x, y: data.y}))}
-        handle=".minimap-handle"
-      >
-        <div ref={minimapRef} className={`absolute z-20 transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="minimap-handle cursor-move h-6 w-full bg-slate-200 dark:bg-slate-700 rounded-t-lg"></div>
+        <div ref={minimapRef} style={{position: 'absolute', top: 20, left: 20}} className={`z-20 transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0'}`}>
           <MiniMap className="w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-b-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden" />
         </div>
-      </Draggable>
     </ReactFlow>
     {menu && (
-      <>
-        <div className="fixed inset-0 z-20" onClick={() => setMenu(null)}></div>
-        <div
-          className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
-          style={{ top: menu.top, left: menu.left }}
-        >
-          {menu.data.node ? (
+      <div
+        className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
+        style={{ top: menu.top, left: menu.left }}
+        onClick={() => setMenu(null)}
+      >
+        {menu.data.node ? (
           <>
             <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
               <span className="material-symbols-outlined text-base text-muted-light dark:text-muted-dark">content_copy</span>
@@ -134,8 +112,7 @@ const FlowCanvas = ({
             <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('summary')}>Summary</button>
           </>
         )}
-        </div>
-      </>
+      </div>
     )}
     </>
   );
