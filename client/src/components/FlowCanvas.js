@@ -24,30 +24,28 @@ const FlowCanvas = ({
   const { deleteElements, screenToFlowPosition } = useReactFlow();
   const [menu, setMenu] = useState(null);
 
-  const onNodesDelete = useCallback(() => {
-    deleteElements({ nodes, edges });
-  }, [nodes, edges, deleteElements]);
+  const onNodesDelete = useCallback((nodesToDelete) => {
+    deleteElements({ nodes: nodesToDelete, edges });
+  }, [edges, deleteElements]);
 
   const onPaneContextMenu = useCallback((event) => {
     event.preventDefault();
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: `dndnode_${+new Date()}`,
       top: event.clientY,
       left: event.clientX,
-      data: { position }
+      data: { position: { x: event.clientX, y: event.clientY } }
     });
-  }, [screenToFlowPosition]);
+  }, []);
 
   const onPaneDoubleClick = useCallback((event) => {
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: `dndnode_${+new Date()}`,
       top: event.clientY,
       left: event.clientX,
-      data: { position }
+      data: { position: { x: event.clientX, y: event.clientY } }
     });
-  }, [screenToFlowPosition]);
+  }, []);
 
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
@@ -88,7 +86,7 @@ const FlowCanvas = ({
       <Controls className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1" />
       <Draggable
         nodeRef={minimapRef}
-        defaultPosition={JSON.parse(localStorage.getItem('minimapPos')) || {x: window.innerWidth - 1000, y: 20}}
+        defaultPosition={JSON.parse(localStorage.getItem('minimapPos')) || { x: 20, y: 20 }}
         onStop={(e, data) => localStorage.setItem('minimapPos', JSON.stringify({x: data.x, y: data.y}))}
         handle=".minimap-handle"
       >
@@ -99,19 +97,20 @@ const FlowCanvas = ({
       </Draggable>
     </ReactFlow>
     {menu && (
-      <div
-        className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
-        style={{ top: menu.top, left: menu.left }}
-        onClick={() => setMenu(null)}
-      >
-        {menu.data.node ? (
+      <>
+        <div className="fixed inset-0 z-20" onClick={() => setMenu(null)}></div>
+        <div
+          className="absolute z-30 w-48 rounded-md bg-white dark:bg-slate-800 shadow-xl border border-border-light dark:border-border-dark py-1"
+          style={{ top: menu.top, left: menu.left }}
+        >
+          {menu.data.node ? (
           <>
             <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full">
               <span className="material-symbols-outlined text-base text-muted-light dark:text-muted-dark">content_copy</span>
               <span>Duplicate</span>
             </button>
             <div className="my-1 h-px bg-border-light dark:bg-border-dark"></div>
-            <button onClick={onNodesDelete} className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
+            <button onClick={() => onNodesDelete([menu.data.node])} className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 w-full">
               <span className="material-symbols-outlined text-base">delete</span>
               <span>Delete</span>
             </button>
@@ -133,7 +132,8 @@ const FlowCanvas = ({
             <button className="flex items-center gap-2 px-3 py-1.5 text-sm w-full hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => onSelect('summary')}>Summary</button>
           </>
         )}
-      </div>
+        </div>
+      </>
     )}
     </>
   );
