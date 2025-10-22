@@ -303,7 +303,16 @@ const App = () => {
       const nodesToSave = nodes.present.map(node => {
         const { data, ...restOfNode } = node;
         const { updateNodeData, ...restOfData } = data;
-        return { ...restOfNode, data: restOfData };
+        return {
+          id: restOfNode.id,
+          type: restOfNode.type,
+          position: restOfNode.position,
+          data: restOfData,
+          parentNode: restOfNode.parentNode,
+          width: restOfNode.width,
+          height: restOfNode.height,
+          style: restOfNode.style,
+         };
       });
 
         await axios.put(`${API_URL}/${currentFlowId}`, {
