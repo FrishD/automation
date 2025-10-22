@@ -30,22 +30,24 @@ const FlowCanvas = ({
 
   const onPaneContextMenu = useCallback((event) => {
     event.preventDefault();
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: `dndnode_${+new Date()}`,
       top: event.clientY,
       left: event.clientX,
-      data: { position: { x: event.clientX, y: event.clientY } }
+      data: { position }
     });
-  }, []);
+  }, [screenToFlowPosition]);
 
   const onPaneDoubleClick = useCallback((event) => {
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: `dndnode_${+new Date()}`,
       top: event.clientY,
       left: event.clientX,
-      data: { position: { x: event.clientX, y: event.clientY } }
+      data: { position }
     });
-  }, []);
+  }, [screenToFlowPosition]);
 
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
