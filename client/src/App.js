@@ -161,12 +161,12 @@ const App = () => {
 
       const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
 
-      const targetNode = nodes.present.find(node =>
+      const parentNode = nodes.present.find(node =>
         position.x >= node.position.x &&
-        position.x <= node.position.x + node.width &&
+        position.x <= node.position.x + (node.width || 300) &&
         position.y >= node.position.y &&
-        position.y <= node.position.y + node.height &&
-        (node.type === 'listen' || node.type === 'loop') // Add other parent node types if needed
+        position.y <= node.position.y + (node.height || 200) &&
+        (node.type === 'listen' || node.type === 'loop')
       );
 
       let initialData = { label: `${type} node` };
@@ -179,11 +179,16 @@ const App = () => {
       const newNode = {
         id: getId(),
         type,
-        position,
+        position: { x: 20, y: 120 }, // Default position inside parent
         data: initialData,
-        parentNode: targetNode ? targetNode.id : undefined,
-        extent: targetNode ? 'parent' : undefined,
+        parentNode: parentNode ? parentNode.id : undefined,
+        extent: parentNode ? 'parent' : undefined,
       };
+
+      // Adjust position if it's not a child node
+      if (!parentNode) {
+        newNode.position = position;
+      }
 
       setNodes(nodes.present.concat(newNode));
     },
@@ -191,21 +196,23 @@ const App = () => {
   );
 
   const onNodeDragStop = useCallback((_, node) => {
-    const targetNode = nodes.present.find(n =>
+    const parentNode = nodes.present.find(n =>
       node.position.x >= n.position.x &&
-      node.position.x <= n.position.x + n.width &&
+      node.position.x <= n.position.x + (n.width || 300) &&
       node.position.y >= n.position.y &&
-      node.position.y <= n.position.y + n.height &&
+      node.position.y <= n.position.y + (n.height || 200) &&
       n.id !== node.id &&
       (n.type === 'listen' || n.type === 'loop')
     );
 
     setNodes(nodes.present.map(n => {
       if (n.id === node.id) {
+        const isChild = !!parentNode;
         return {
           ...n,
-          parentNode: targetNode ? targetNode.id : undefined,
-          extent: targetNode ? 'parent' : undefined,
+          parentNode: isChild ? parentNode.id : undefined,
+          extent: isChild ? 'parent' : undefined,
+          position: isChild ? { x: 20, y: n.position.y } : n.position, // Reset x, keep y
         };
       }
       return n;
