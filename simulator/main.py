@@ -3,25 +3,43 @@ import requests
 import whisper
 import speech_recognition as sr
 from gtts import gTTS
-from playsound import playsound
+from playsound3 import playsound
 import tempfile
 import time
 import traceback
+import asyncio
+import edge_tts
 
 # --- Configuration ---
 API_BASE_URL = "http://localhost:5000/api/flows"
 FLOW_ID = None
+
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # --- Helper Functions ---
 def speak(text):
     """Converts text to speech and plays it."""
     try:
         print(f"🤖 Agent: {text}")
-        tts = gTTS(text=text, lang='he')
+
+        # Detect language - use Hebrew voice for Hebrew text, English for English
+        if any('\u0590' <= c <= '\u05FF' for c in text):
+            voice = "he-IL-HilaNeural"
+        else:
+            voice = "en-US-AriaNeural"
+
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
-            tts.save(fp.name)
-            playsound(fp.name)
-        os.remove(fp.name)
+            temp_file = fp.name
+
+        # Create speech asynchronously
+        async def create_speech():
+            communicate = edge_tts.Communicate(text, voice)
+            await communicate.save(temp_file)
+
+        asyncio.run(create_speech())
+        playsound(temp_file)
+        os.remove(temp_file)
     except Exception as e:
         print(f"❌ Error in text-to-speech: {e}")
 

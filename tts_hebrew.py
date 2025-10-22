@@ -1,7 +1,7 @@
 import edge_tts
 import asyncio
 import os
-from playsound import playsound
+from playsound3 import playsound
 
 async def _create_speech(text, output_file):
     """פונקציה פנימית ליצירת קובץ דיבור"""
