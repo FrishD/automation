@@ -9,7 +9,7 @@ test('renders the sidebar with blocks', async () => {
   axios.post.mockResolvedValue({ data: { nodes: [], edges: [] } });
   render(<App />);
   await waitFor(() => {
-    const sidebarTitle = screen.getByText(/Blocks/i);
+    const sidebarTitle = screen.getByText(/Palette/i);
     expect(sidebarTitle).toBeInTheDocument();
   });
 });
