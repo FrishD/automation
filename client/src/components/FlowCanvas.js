@@ -37,13 +37,14 @@ const FlowCanvas = ({
     });
   }, []);
 
+
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
     setMenu({
       id: node.id,
       top: event.clientY,
       left: event.clientX,
-      data: { node }
+      data: { node, position: { x: event.clientX, y: event.clientY } }
     });
   }, []);
 
