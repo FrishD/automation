@@ -212,36 +212,47 @@ const App = () => {
 
   const onNodeDragStop = useCallback((_, node) => {
     const parentNode = nodes.present.find(n =>
-      node.position.x >= n.position.x &&
-      node.position.x <= n.position.x + (n.width || 300) &&
-      node.position.y >= n.position.y &&
-      node.position.y <= n.position.y + (n.height || 200) &&
-      n.id !== node.id &&
-      (n.type === 'listen' || n.type === 'loop')
+        node.position.x >= n.position.x &&
+        node.position.x <= n.position.x + (n.width || 300) &&
+        node.position.y >= n.position.y &&
+        node.position.y <= n.position.y + (n.height || 200) &&
+        n.id !== node.id &&
+        (n.type === 'listen' || n.type === 'loop')
     );
 
-    const children = nodes.present.filter(n => n.parentNode === (parentNode ? parentNode.id : node.parentNode));
-    const childCount = children.length;
+    let newNodes = [...nodes.present];
+    const nodeIndex = newNodes.findIndex(n => n.id === node.id);
 
-    setNodes(nodes.present.map(n => {
-      if (n.id === node.id) {
+    if (nodeIndex > -1) {
         const isChild = !!parentNode;
-        return {
-          ...n,
-          parentNode: isChild ? parentNode.id : undefined,
-          extent: isChild ? 'parent' : undefined,
-          position: isChild ? { x: 20, y: 120 + (childCount * 50) } : n.position, // Position children below each other
+        newNodes[nodeIndex] = {
+            ...newNodes[nodeIndex],
+            parentNode: isChild ? parentNode.id : undefined,
+            extent: isChild ? 'parent' : undefined,
         };
-      }
-      if (parentNode && n.id === parentNode.id) {
-        return {
-          ...n,
-          height: 200 + (childCount * 50),
-        };
-      }
-      return n;
-    }));
-  }, [nodes.present, setNodes]);
+
+        if (isChild) {
+            const children = newNodes.filter(n => n.parentNode === parentNode.id);
+            children.forEach((child, index) => {
+                const childIndex = newNodes.findIndex(n => n.id === child.id);
+                newNodes[childIndex] = {
+                    ...newNodes[childIndex],
+                    position: { x: 20, y: 120 + (index * 110) },
+                };
+            });
+
+            const parentIndex = newNodes.findIndex(n => n.id === parentNode.id);
+            if (parentIndex > -1) {
+                newNodes[parentIndex] = {
+                    ...newNodes[parentIndex],
+                    style: { ...newNodes[parentIndex].style, height: 200 + (children.length * 110) },
+                };
+            }
+        }
+    }
+
+    setNodes(newNodes);
+}, [nodes.present, setNodes]);
 
   const onPaneContextMenu = (event) => {
     event.preventDefault();
@@ -289,10 +300,11 @@ const App = () => {
   const saveFlow = async () => {
     if (!currentFlowId) return;
     try {
-        const nodesToSave = nodes.present.map(({ data, ...node }) => {
-            const { onChange, ...restData } = data;
-            return { ...node, data: restData };
-        });
+      const nodesToSave = nodes.present.map(node => {
+        const { data, ...restOfNode } = node;
+        const { updateNodeData, ...restOfData } = data;
+        return { ...restOfNode, data: restOfData };
+      });
 
         await axios.put(`${API_URL}/${currentFlowId}`, {
             name: flowName,
