@@ -185,20 +185,29 @@ const App = () => {
   // Effect to update edge labels when a condition node's data changes
   useEffect(() => {
     if (loading) return;
-    setFlowState({
-      ...flowState.present,
-      edges: edges.map((edge) => {
-        if (edge.sourceHandle) {
-          const sourceNode = nodes.find((node) => node.id === edge.source);
-          if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
-            const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
-            edge.label = keyword || `[Connect to save keyword]`;
+
+    let hasChanged = false;
+    const newEdges = edges.map((edge) => {
+      if (edge.sourceHandle) {
+        const sourceNode = nodes.find((node) => node.id === edge.source);
+        if (sourceNode?.data?.conditions?.[edge.sourceHandle]) {
+          const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword || '[Connect to save keyword]';
+          if (edge.label !== keyword) {
+            hasChanged = true;
+            return { ...edge, label: keyword };
           }
         }
-        return edge;
-      }),
+      }
+      return edge;
     });
-  }, [nodes, setFlowState, loading, flowState.present, edges]);
+
+    if (hasChanged) {
+      setFlowState({
+        ...flowState.present,
+        edges: newEdges,
+      });
+    }
+  }, [nodes, edges, setFlowState, loading, flowState.present]);
 
   const onConnect = useCallback((params) => {
     let newEdge = { ...params };
