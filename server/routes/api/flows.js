@@ -60,6 +60,74 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// @route   POST api/flows/:id/history
+// @desc    Save a snapshot of the flow
+// @access  Public
+router.post('/:id/history', async (req, res) => {
+  try {
+    const flow = await Flow.findById(req.params.id);
+    if (!flow) {
+      return res.status(404).json({ message: 'Flow not found' });
+    }
+
+    const snapshot = {
+      nodes: req.body.nodes,
+      edges: req.body.edges,
+    };
+
+    flow.history.push(snapshot);
+    await flow.save();
+
+    res.status(201).json(flow.history);
+  } catch (err) {
+    console.error('Error saving snapshot:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET api/flows/:id/history
+// @desc    Get the history of a flow
+// @access  Public
+router.get('/:id/history', async (req, res) => {
+    try {
+        const flow = await Flow.findById(req.params.id);
+        if (!flow) {
+            return res.status(404).json({ message: 'Flow not found' });
+        }
+        res.json(flow.history);
+    } catch (err) {
+        console.error('Error fetching history:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   PUT api/flows/:id/history/:historyId
+// @desc    Restore a flow to a specific version
+// @access  Public
+router.put('/:id/history/:historyId', async (req, res) => {
+    try {
+        const flow = await Flow.findById(req.params.id);
+        if (!flow) {
+            return res.status(404).json({ message: 'Flow not found' });
+        }
+
+        const historyEntry = flow.history.id(req.params.historyId);
+        if (!historyEntry) {
+            return res.status(404).json({ message: 'History not found' });
+        }
+
+        flow.nodes = historyEntry.nodes;
+        flow.edges = historyEntry.edges;
+
+        await flow.save();
+
+        res.json(flow);
+    } catch (err) {
+        console.error('Error restoring flow:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // @route   GET api/flows/:id
 // @desc    Get a single flow
 // @access  Public

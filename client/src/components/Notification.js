@@ -20,7 +20,7 @@ const Notification = ({ message, type, onClear }) => {
     return null;
   }
 
-  const baseClasses = "fixed top-5 right-5 p-4 rounded-lg shadow-lg text-white";
+  const baseClasses = "fixed top-5 left-5 p-4 rounded-lg shadow-lg text-white";
   const typeClasses = {
     success: "bg-green-500",
     error: "bg-red-500",

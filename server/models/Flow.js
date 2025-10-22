@@ -39,6 +39,16 @@ const FlowSchema = new Schema({
   },
   nodes: [NodeSchema],
   edges: [EdgeSchema],
+  history: [
+    {
+      nodes: [NodeSchema],
+      edges: [EdgeSchema],
+      savedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now
