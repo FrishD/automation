@@ -79,10 +79,15 @@ def speak(text):
 def listen_for_command(model, language='he'):
     """Listens for a command from the user and returns it as text."""
     r = sr.Recognizer()
+    # Increase energy threshold to make it more sensitive
+    r.energy_threshold = 4000
     with sr.Microphone() as source:
         print(f"\n🎤 Listening... (Language: {language})")
         r.pause_threshold = 1.5
+        # Adjust for ambient noise to improve accuracy
+        print("    (Calibrating for ambient noise...)")
         r.adjust_for_ambient_noise(source, duration=1)
+        print("    (Calibration complete. Speak now.)")
         audio = r.listen(source)
 
     try:
@@ -126,13 +131,27 @@ class ConversationEngine:
 
     def _replace_variables(self, text):
         """Replaces {variable_name} placeholders with stored variable values."""
+        print(f"  🔍 Replacing variables in text: '{text}'")
+        print(f"  - Available variables: {self.variables}")
+        original_text = text
         for var_name, var_value in self.variables.items():
+            if not var_name: continue
             # Use a robust regex to replace {  var_name  } placeholders
             # It handles whitespace and escapes the variable name for safety
             pattern = r'\{\s*' + re.escape(var_name.strip()) + r'\s*\}'
             # Ensure the replacement value is a string
             replacement = str(var_value if var_value is not None else '')
+
+            pre_replace_text = text
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            if pre_replace_text != text:
+                print(f"    ✅ Replaced '{{{var_name}}}' with '{replacement}'")
+
+        if original_text == text:
+            print("  - No variables were replaced.")
+        else:
+            print(f"  - Final text: '{text}'")
+
         return text
 
     def _find_next_node_id(self, source_node_id, source_handle=None):
