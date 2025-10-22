@@ -59,14 +59,10 @@ const App = () => {
   const [showMinimap, setShowMinimap] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  const onNodeDataChange = useCallback((nodeId, newData) => {
-    const newNodes = nodes.present.map((node) => {
-      if (node.id === nodeId) {
-        return { ...node, data: { ...node.data, ...newData } };
-      }
-      return node;
-    });
-    setNodes(newNodes);
+  const updateNodeData = useCallback((nodeId, newData) => {
+    setNodes(nodes.present.map(node =>
+      node.id === nodeId ? { ...node, data: newData } : node
+    ));
   }, [nodes.present, setNodes]);
 
 
@@ -75,10 +71,10 @@ const App = () => {
       ...node,
       data: {
         ...node.data,
-        onChange: (newData) => onNodeDataChange(node.id, newData)
+        updateNodeData: updateNodeData
       }
     }));
-  }, [nodes.present, onNodeDataChange]);
+  }, [nodes.present, updateNodeData]);
 
   const createNewFlow = useCallback(async () => {
     try {
