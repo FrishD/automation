@@ -42,7 +42,15 @@ const FlowSchema = new Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  history: [{
+    nodes: [NodeSchema],
+    edges: [EdgeSchema],
+    savedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 });
 
 module.exports = mongoose.model('Flow', FlowSchema);

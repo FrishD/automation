@@ -16,7 +16,7 @@ const Block = ({ type, icon, name }) => (
     </div>
 );
 
-const Sidebar = () => {
+const Sidebar = ({ onReset, className }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const blocks = {
@@ -50,7 +50,7 @@ const Sidebar = () => {
   }, {});
 
   return (
-    <aside className="w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col">
+    <aside className={`w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col ${className}`}>
         <div className="p-4 border-b border-border-light dark:border-border-dark">
             <h1 className="text-lg font-bold text-on-surface-light dark:text-on-surface-dark">Palette</h1>
         </div>
@@ -79,6 +79,15 @@ const Sidebar = () => {
                 </div>
               ))}
             </div>
+        </div>
+        <div className="p-4 border-t border-border-light dark:border-border-dark">
+            <button
+                onClick={onReset}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+            >
+                <span className="material-symbols-outlined text-base">refresh</span>
+                <span>Reset Canvas</span>
+            </button>
         </div>
     </aside>
   );

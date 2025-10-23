@@ -38,23 +38,23 @@ router.post('/', async (req, res) => {
 // @desc    Update a flow
 // @access  Public
 router.put('/:id', async (req, res) => {
-  console.log('Received data for flow update:', JSON.stringify(req.body, null, 2));
   try {
-    const flow = await Flow.findByIdAndUpdate(
-      req.params.id,
-      {
-        name: req.body.name,
-        nodes: req.body.nodes,
-        edges: req.body.edges
-      },
-      { new: true, runValidators: true }
-    );
+    const flow = await Flow.findById(req.params.id);
 
     if (!flow) {
       return res.status(404).json({ message: 'Flow not found' });
     }
 
-    res.json(flow);
+    // Add the current state to history
+    flow.history.push({ nodes: flow.nodes, edges: flow.edges });
+
+    // Update the flow with new data
+    flow.name = req.body.name;
+    flow.nodes = req.body.nodes;
+    flow.edges = req.body.edges;
+
+    const updatedFlow = await flow.save();
+    res.json(updatedFlow);
   } catch (err) {
     console.error('Error updating flow:', err); // Log the full error
     res.status(400).json({ message: 'Error updating flow', error: err.message });
@@ -71,6 +71,21 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ message: 'Flow not found' });
       }
       res.json(flow);
+    } catch (err) {
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+// @route   GET api/flows/:id/history
+// @desc    Get a flow's history
+// @access  Public
+router.get('/:id/history', async (req, res) => {
+    try {
+      const flow = await Flow.findById(req.params.id);
+      if (!flow) {
+        return res.status(404).json({ message: 'Flow not found' });
+      }
+      res.json(flow.history);
     } catch (err) {
       res.status(500).json({ message: 'Server error' });
     }

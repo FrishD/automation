@@ -3,7 +3,3 @@ gTTS
 requests
 PyAudio
 playsound==1.2.2
-langdetect
-dateparser
-regex
-edge-tts

@@ -1,34 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 
-const ConditionNode = ({ data, id }) => {
-    // Use state to manage conditions, but sync with props
+const ConditionNode = ({ data }) => {
     const [conditions, setConditions] = useState(data.conditions || [{ keyword: '' }]);
-
-    useEffect(() => {
-        // If the data from the flow changes, update the internal state
-        setConditions(data.conditions || [{ keyword: '' }]);
-    }, [data.conditions]);
 
     const handleConditionChange = (index, value) => {
         const newConditions = [...conditions];
         newConditions[index] = { ...newConditions[index], keyword: value };
         setConditions(newConditions);
-        if (data.updateNodeData) {
-            data.updateNodeData(id, { ...data, conditions: newConditions });
-        }
+        data.onChange({ ...data, conditions: newConditions });
     };
 
     const addCondition = () => {
         const newConditions = [...conditions, { keyword: '' }];
         setConditions(newConditions);
-        if (data.updateNodeData) {
-            data.updateNodeData(id, { ...data, conditions: newConditions });
-        }
+        data.onChange({ ...data, conditions: newConditions });
     };
 
     return (
-        <div className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64">
+        <div
+            className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 w-64 transition-all duration-300 ${
+                data.isHighlighted ? 'border-primary shadow-primary/50' : 'border-slate-200 dark:border-slate-700'
+            }`}
+        >
             <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary text-2xl">call_split</span>
                 <span className="font-semibold text-sm">If Condition</span>
