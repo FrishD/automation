@@ -224,12 +224,16 @@ class ConversationEngine:
                         self.current_node_id = None
                         break
 
-                    # Extract entities
-                    found_entities_count = 0
+                    # If there are no variable nodes, save the full text to a default variable
                     if not child_variable_nodes:
-                        all_entities_found = True
+                        if user_input_from_listen:
+                            self.variables['last_utterance'] = user_input_from_listen
+                            print(f"  ✅ Stored full text to 'last_utterance': {user_input_from_listen}")
+                            all_entities_found = True
                         break
 
+                    # --- Entity Extraction Logic ---
+                    found_entities_count = 0
                     for var_node in child_variable_nodes:
                         var_data = var_node.get('data', {})
                         var_name = var_data.get('variableName')
@@ -238,13 +242,21 @@ class ConversationEngine:
                         if not var_name:
                             continue
 
+                        # Always save the full text if the type is 'full_text'
+                        if entity_type == 'full_text':
+                            self.variables[var_name] = user_input_from_listen
+                            print(f"  ✅ Extracted '{var_name}' (full_text): {user_input_from_listen}")
+                            found_entities_count += 1
+                            continue
+
+                        # For other entity types, try to extract
                         extracted_value = extract_entity(user_input_from_listen, entity_type)
                         if extracted_value:
                             self.variables[var_name] = extracted_value
                             print(f"  ✅ Extracted '{var_name}' ({entity_type}): {extracted_value}")
                             found_entities_count += 1
                         else:
-                            print(f"  ❌ Could not extract '{var_name}' ({entity_type})")
+                            print(f"  ❌ Could not extract '{var_name}' ({entity_type}) from '{user_input_from_listen}'")
                             self.variables[var_name] = None # Explicitly set to None
 
                     if found_entities_count == len(child_variable_nodes):
