@@ -9,7 +9,6 @@ import ReactFlow, {
   applyEdgeChanges,
 } from 'reactflow';
 import useUndo from 'use-undo';
-import Joyride, { STATUS } from 'react-joyride';
 import 'reactflow/dist/style.css';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
@@ -26,12 +25,13 @@ import PlayAudioNode from './components/nodes/PlayAudioNode.js';
 import ConfirmationNode from './components/nodes/ConfirmationNode.js';
 import SummaryNode from './components/nodes/SummaryNode.js';
 import Notification from './components/Notification.js';
-import SimulationModal from './components/SimulationModal.js';
-import HistoryModal from './components/HistoryModal.js';
-import HelpModal from './components/HelpModal.js';
+import Modal from './components/Modal.js';
+import Joyride, { STATUS } from 'react-joyride';
+import Simulator from './components/Simulator.js';
+import HistoryPanel from './components/HistoryPanel.js';
+
 
 const API_URL = 'http://localhost:5000/api/flows';
-const WEBSOCKET_URL = 'ws://localhost:5000';
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
@@ -62,106 +62,47 @@ const App = () => {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [showMinimap, setShowMinimap] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [isSimulationOpen, setIsSimulationOpen] = useState(false);
-  const [simulationLogs, setSimulationLogs] = useState([]);
-  const ws = useRef(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [flowHistory, setFlowHistory] = useState([]);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [activeNodeId, setActiveNodeId] = useState(null);
-  const [{ run, steps }, setTour] = useState({ run: false, steps: [] });
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [runTour, setRunTour] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [highlightedNode, setHighlightedNode] = useState(null);
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
+
+  const handleRestore = (version) => {
+    setNodes(version.nodes);
+    setEdges(version.edges);
+    setIsHistoryPanelOpen(false);
+    setNotification({ message: 'Flow restored!', type: 'success' });
+  };
 
   const tourSteps = [
     {
-      target: '.tour-sidebar',
-      content: 'This is the palette. You can drag nodes from here onto the canvas.',
+      target: '.sidebar',
+      content: 'This is the palette. Drag and drop nodes from here to the canvas to build your conversation flow.',
     },
     {
-      target: '.tour-canvas',
-      content: 'This is the canvas. You can build your conversation flow here.',
+      target: '.react-flow__pane',
+      content: 'This is the canvas. You can arrange your nodes here.',
     },
     {
-      target: '.tour-flow-name',
-      content: 'You can change the name of your flow here.',
-    },
-    {
-      target: '.tour-save',
-      content: 'Click here to save your flow.',
-    },
-    {
-      target: '.tour-simulate',
-      content: 'Click here to run a simulation of your flow.',
-    },
-    {
-      target: '.tour-undo',
-      content: 'You can undo your last action here.',
-    },
-    {
-      target: '.tour-redo',
-      content: 'You can redo your last action here.',
+      target: '.header-controls',
+      content: 'Use these controls to save your flow, undo/redo changes, and more.',
     },
   ];
-
-  const startTour = () => {
-    setTour({ run: true, steps: tourSteps });
-  };
 
   const handleJoyrideCallback = (data) => {
     const { status } = data;
     if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-      setTour({ run: false, steps: [] });
+      setRunTour(false);
     }
   };
 
-  const openHistory = async () => {
-    if (!currentFlowId) return;
-    try {
-      const response = await axios.get(`${API_URL}/${currentFlowId}`);
-      setFlowHistory(response.data.history.reverse()); // Show newest first
-      setIsHistoryOpen(true);
-    } catch (error) {
-      setNotification({ message: 'Error fetching history.', type: 'error' });
-    }
-  };
-
-  const restoreVersion = async (version) => {
-    setNodes(version.nodes);
-    setEdges(version.edges);
-    setIsHistoryOpen(false);
-    setNotification({ message: 'Flow restored to a previous version. Save to make it permanent.', type: 'info' });
-  };
-
-  const startSimulation = () => {
-    if (!currentFlowId) {
-      setNotification({ message: 'Please save the flow before running a simulation.', type: 'error' });
-      return;
-    }
-
-    ws.current = new WebSocket(WEBSOCKET_URL);
-    setSimulationLogs(['Connecting to simulation server...']);
-    setIsSimulationOpen(true);
-
-    ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ flowId: currentFlowId }));
-    };
-
-    ws.current.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'log') {
-        setSimulationLogs(prev => [...prev, message.data]);
-      } else if (message.type === 'error') {
-        setSimulationLogs(prev => [...prev, `ERROR: ${message.data}`]);
-      } else if (message.type === 'end') {
-        setSimulationLogs(prev => [...prev, message.data]);
-        setActiveNodeId(null);
-      } else if (message.type === 'active_node') {
-        setActiveNodeId(message.nodeId);
-      }
-    };
-
-    ws.current.onclose = () => {
-      setSimulationLogs(prev => [...prev, '\nSimulation finished.']);
-    };
+  const handleReset = () => {
+    const startNode = nodes.present.find(node => node.type === 'start');
+    setNodes(startNode ? [startNode] : []);
+    setEdges([]);
+    setIsResetModalOpen(false);
+    setNotification({ message: 'Canvas reset!', type: 'success' });
   };
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
@@ -174,15 +115,17 @@ const App = () => {
     setNodes(newNodes);
   }, [nodes.present, setNodes]);
 
+
   const nodesWithDataHandlers = useMemo(() => {
     return nodes.present.map(node => ({
       ...node,
       data: {
         ...node.data,
-        onChange: (newData) => onNodeDataChange(node.id, newData)
+        onChange: (newData) => onNodeDataChange(node.id, newData),
+        isHighlighted: node.id === highlightedNode,
       }
     }));
-  }, [nodes.present, onNodeDataChange]);
+  }, [nodes.present, onNodeDataChange, highlightedNode]);
 
   const createNewFlow = useCallback(async () => {
     try {
@@ -202,25 +145,6 @@ const App = () => {
     }
   }, [setNodes, setEdges, setFlowName, setCurrentFlowId]);
 
-  const saveFlow = useCallback(async () => {
-    if (!currentFlowId) return;
-    try {
-        const nodesToSave = nodes.present.map(({ data, ...node }) => {
-            const { onChange, ...restData } = data;
-            return { ...node, data: restData };
-        });
-
-        await axios.put(`${API_URL}/${currentFlowId}`, {
-            name: flowName,
-            nodes: nodesToSave,
-            edges: edges.present,
-        });
-        setNotification({ message: 'Flow saved!', type: 'success' });
-    } catch (error) {
-        console.error("Error saving flow:", error);
-        setNotification({ message: 'Error saving flow.', type: 'error' });
-    }
-  }, [currentFlowId, flowName, nodes.present, edges.present]);
 
   useEffect(() => {
     const fetchInitialFlow = async () => {
@@ -241,54 +165,31 @@ const App = () => {
         console.error("Error fetching flows:", error);
       } finally {
         setLoading(false);
-        const hasSeenTour = localStorage.getItem('hasSeenTour');
-        if (!hasSeenTour) {
-          startTour();
-          localStorage.setItem('hasSeenTour', 'true');
-        }
       }
     };
     fetchInitialFlow();
   }, [setNodes, setEdges, createNewFlow]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      saveFlow();
-    }, 30 * 60 * 1000); // 30 minutes
-
-    return () => clearInterval(interval);
-  }, [saveFlow]);
-
-  useEffect(() => {
-    setNodes(
-      nodes.present.map((node) => {
-        if (node.id === activeNodeId) {
-          return {
-            ...node,
-            style: { ...node.style, boxShadow: '0 0 15px 5px #34D399' },
-          };
-        }
-        const { boxShadow, ...restStyle } = node.style || {};
-        return { ...node, style: restStyle };
-      })
-    );
-  }, [activeNodeId, setNodes, nodes.present]);
-
+  // Effect to update edge labels when a condition node's data changes
   useEffect(() => {
     if (loading) return;
-    setEdges(
-      edges.present.map((edge) => {
-        if (edge.sourceHandle) {
-          const sourceNode = nodes.present.find((node) => node.id === edge.source);
-          if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
-            const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
-            edge.label = keyword || `[Connect to save keyword]`;
+    const newEdges = edges.present.map((edge) => {
+      if (edge.sourceHandle) {
+        const sourceNode = nodes.present.find((node) => node.id === edge.source);
+        if (sourceNode && sourceNode.data.conditions && sourceNode.data.conditions[edge.sourceHandle]) {
+          const keyword = sourceNode.data.conditions[edge.sourceHandle].keyword;
+          if (edge.label !== keyword) {
+            return { ...edge, label: keyword || `[Connect to save keyword]` };
           }
         }
-        return edge;
-      })
-    );
-  }, [nodes.present, setEdges, loading, edges.present]);
+      }
+      return edge;
+    });
+
+    if (JSON.stringify(newEdges) !== JSON.stringify(edges.present)) {
+      setEdges(newEdges);
+    }
+  }, [nodes.present, edges.present, setEdges, loading]);
 
   const onConnect = useCallback((params) => {
     let newEdge = { ...params };
@@ -300,7 +201,7 @@ const App = () => {
         }
     }
     setEdges(addEdge(newEdge, edges.present));
-  }, [nodes.present, setEdges, edges.present]);
+    }, [nodes.present, setEdges, edges.present]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -377,12 +278,23 @@ const App = () => {
     setMenu(null);
   };
 
-  const handleReset = () => {
-    const isConfirmed = window.confirm('Are you sure you want to reset the canvas? All unsaved changes will be lost.');
-    if (isConfirmed) {
-      const initialNodes = [{ id: 'start_node_0', type: 'start', position: { x: 150, y: 150 }, data: { label: 'Start' } }];
-      setNodes(initialNodes);
-      setEdges([]);
+  const saveFlow = useCallback(async () => {
+    if (!currentFlowId) return;
+    try {
+        const nodesToSave = nodes.present.map(({ data, ...node }) => {
+            const { onChange, ...restData } = data;
+            return { ...node, data: restData };
+        });
+
+        await axios.put(`${API_URL}/${currentFlowId}`, {
+            name: flowName,
+            nodes: nodesToSave,
+            edges: edges.present,
+        });
+        setNotification({ message: 'Flow saved!', type: 'success' });
+    } catch (error) {
+        console.error("Error saving flow:", error);
+        setNotification({ message: 'Error saving flow.', type: 'error' });
     }
   };
 
@@ -394,87 +306,85 @@ const App = () => {
     );
   }
 
-  const closeSimulation = () => {
-    if (ws.current) {
-      ws.current.close();
-    }
-    setIsSimulationOpen(false);
-  };
-
   return (
     <div className="flex h-screen">
       <Joyride
+        steps={tourSteps}
+        run={runTour}
         callback={handleJoyrideCallback}
         continuous
-        run={run}
-        steps={steps}
         showProgress
         showSkipButton
+        styles={{
+          options: {
+            arrowColor: '#fff',
+            backgroundColor: '#fff',
+            primaryColor: '#007bff',
+            textColor: '#333',
+            zIndex: 1000,
+          }
+        }}
       />
       <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
-      <SimulationModal
-        isOpen={isSimulationOpen}
-        logs={simulationLogs}
-        onClose={closeSimulation}
-        onClear={() => setSimulationLogs([])}
-      />
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        history={flowHistory}
-        onClose={() => setIsHistoryOpen(false)}
-        onRestore={restoreVersion}
-      />
-      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <Modal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onConfirm={handleReset}
+        title="Reset Canvas"
+      >
+        Are you sure you want to reset the canvas? All unsaved changes will be lost.
+      </Modal>
       <ReactFlowProvider>
-        <aside className="w-72 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col tour-sidebar">
-          <Sidebar />
-        </aside>
+        <Simulator
+          isOpen={isSimulatorOpen}
+          onClose={() => {
+            setIsSimulatorOpen(false);
+            setHighlightedNode(null);
+          }}
+          currentFlowId={currentFlowId}
+          onNodeHighlight={setHighlightedNode}
+        />
+        <HistoryPanel
+          isOpen={isHistoryPanelOpen}
+          onClose={() => setIsHistoryPanelOpen(false)}
+          currentFlowId={currentFlowId}
+          onRestore={handleRestore}
+        />
+        <Sidebar onReset={() => setIsResetModalOpen(true)} className="sidebar" />
         <main className="flex-1 bg-background-light dark:bg-background-dark p-6">
-          <div className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col tour-canvas" style={{backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
-            <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
-              <div className="flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
+          <div className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col" style={{backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
+            <div ref={reactFlowWrapper} className={`flex-grow relative cursor-grab active:cursor-grabbing ${isSimulatorOpen ? 'simulator-open' : ''}`}>
+              <div className="header-controls flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
                 <div className="flex items-center gap-1">
-                  <button onClick={() => { undoNodes(); undoEdges(); }} disabled={!canUndoNodes || !canUndoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50 tour-undo">
+                  <button onClick={() => { undoNodes(); undoEdges(); }} disabled={!canUndoNodes || !canUndoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">undo</span>
                   </button>
-                  <button onClick={() => { redoNodes(); redoEdges(); }} disabled={!canRedoNodes || !canRedoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50 tour-redo">
+                  <button onClick={() => { redoNodes(); redoEdges(); }} disabled={!canRedoNodes || !canRedoEdges} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">redo</span>
-                  </button>
-                  <button onClick={handleReset} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
-                    <span className="material-symbols-outlined text-lg">restart_alt</span>
                   </button>
                 </div>
                 <input
                   type="text"
                   value={flowName}
                   onChange={(e) => setFlowName(e.target.value)}
-                  className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center tour-flow-name"
+                  className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
                 />
                 <div className="flex items-center gap-1.5 mr-1">
-                  <button className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
-                    <span className="material-symbols-outlined text-base">upload</span>
-                    <span>Load</span>
+                  <button onClick={() => setIsSimulatorOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-outlined text-lg">play_circle</span>
                   </button>
-                  <button onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90 tour-save">
+                  <button onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-outlined text-lg">history</span>
+                  </button>
+                   <button onClick={() => setRunTour(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    <span className="material-symbols-outlined text-lg">help</span>
+                  </button>
+                  <button onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
                     <span className="material-symbols-outlined text-base">save</span>
                     <span>Save</span>
                   </button>
-                  <button onClick={startSimulation} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-green-500 text-white hover:bg-green-600 tour-simulate">
-                    <span className="material-symbols-outlined text-base">play_circle</span>
-                    <span>Simulate</span>
-                  </button>
-                  <button onClick={openHistory} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
-                    <span className="material-symbols-outlined text-base">history</span>
-                    <span>History</span>
-                  </button>
-                  <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover-bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
                     <span className="material-symbols-outlined text-lg">map</span>
-                  </button>
-                   <button onClick={startTour} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400" title="Start Tour">
-                    <span className="material-symbols-outlined text-lg">tour</span>
-                  </button>
-                   <button onClick={() => setIsHelpOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400" title="Help">
-                    <span className="material-symbols-outlined text-lg">help</span>
                   </button>
                 </div>
               </div>

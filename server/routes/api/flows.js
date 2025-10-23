@@ -76,5 +76,20 @@ router.get('/:id', async (req, res) => {
     }
   });
 
+// @route   GET api/flows/:id/history
+// @desc    Get a flow's history
+// @access  Public
+router.get('/:id/history', async (req, res) => {
+    try {
+      const flow = await Flow.findById(req.params.id);
+      if (!flow) {
+        return res.status(404).json({ message: 'Flow not found' });
+      }
+      res.json(flow.history);
+    } catch (err) {
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
 
 module.exports = router;

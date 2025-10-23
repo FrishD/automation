@@ -3,7 +3,11 @@ import { Handle, Position } from 'reactflow';
 
 const SummaryNode = ({ data, selected }) => {
   return (
-    <div className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64 ${selected ? 'border-primary ring-4 ring-primary/20' : ''}`}>
+    <div
+      className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 w-64 transition-all duration-300 ${
+        data.isHighlighted ? 'border-primary shadow-primary/50' : selected ? 'border-primary ring-4 ring-primary/20' : 'border-slate-200 dark:border-slate-700'
+      }`}
+    >
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-primary text-2xl">summarize</span>
         <span className="font-semibold text-sm">Summary</span>

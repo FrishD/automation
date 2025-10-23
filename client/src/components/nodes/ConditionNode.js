@@ -18,7 +18,11 @@ const ConditionNode = ({ data }) => {
     };
 
     return (
-        <div className="relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64">
+        <div
+            className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 w-64 transition-all duration-300 ${
+                data.isHighlighted ? 'border-primary shadow-primary/50' : 'border-slate-200 dark:border-slate-700'
+            }`}
+        >
             <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary text-2xl">call_split</span>
                 <span className="font-semibold text-sm">If Condition</span>
