@@ -103,12 +103,17 @@ class ConversationEngine:
         user_input_from_listen = ""
         step_count = 0
 
+        import json
         print("\n" + "="*50)
         print("🚀 STARTING CONVERSATION FLOW")
         print("="*50 + "\n")
 
         while self.current_node_id:
             step_count += 1
+
+            # Print current node ID for the frontend
+            print(json.dumps({"type": "active_node", "nodeId": self.current_node_id}), flush=True)
+
             print(f"\n{'='*50}")
             print(f"STEP {step_count}")
             print(f"{'='*50}")
@@ -203,46 +208,19 @@ def get_flow_from_server(flow_id):
         return None
 
 if __name__ == "__main__":
+    import sys
+    import json
+
     print("\n" + "="*60)
     print("🎯 CONVERSATION SIMULATOR STARTING")
     print("="*60 + "\n")
 
     try:
-        print(f"📡 Connecting to server: {API_BASE_URL}")
-        response = requests.get(API_BASE_URL, timeout=5)
-        print(f"✅ Server responded with status: {response.status_code}")
-
-        all_flows = response.json()
-        print(f"📋 Found {len(all_flows)} flow(s)")
-
-        if all_flows:
-            FLOW_ID = all_flows[0]['_id']
-            flow_name = all_flows[0].get('name', 'Unnamed')
-            print(f"✅ Loaded flow: '{flow_name}' (ID: {FLOW_ID})")
-        else:
-            print("❌ No flows found on the server.")
-            print("💡 Please create a flow in the web interface first.")
-            exit(1)
-
-    except requests.exceptions.ConnectionError as e:
-        print(f"\n❌ Cannot connect to server at {API_BASE_URL}")
-        print(f"💡 Make sure the Node.js server is running:")
-        print(f"   cd server && npm start")
-        exit(1)
-    except requests.exceptions.Timeout:
-        print(f"\n❌ Connection timeout to {API_BASE_URL}")
-        exit(1)
+        flow_data_string = sys.stdin.read()
+        flow = json.loads(flow_data_string)
+        print("✅ Flow data received from stdin")
     except Exception as e:
-        print(f"\n❌ Unexpected error while connecting to server:")
-        print(f"   Type: {type(e).__name__}")
-        print(f"   Error: {e}")
-        traceback.print_exc()
-        exit(1)
-
-    # Fetch the full flow data
-    flow = get_flow_from_server(FLOW_ID)
-    if not flow:
-        print("❌ Failed to load flow from server")
+        print(f"❌ Error reading flow data from stdin: {e}")
         exit(1)
 
     try:
