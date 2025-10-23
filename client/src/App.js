@@ -11,6 +11,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
+import useUndo from 'use-undo';
 
 import StartNode from './components/nodes/StartNode.js';
 import SpeakNode from './components/nodes/SpeakNode.js';
@@ -50,10 +51,25 @@ const AppComponent = () => {
     summary: SummaryNode,
   }), []);
   const reactFlowWrapper = useRef(null);
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
-  const onNodesChange = (changes) => setNodes((nds) => applyNodeChanges(changes, nds));
-  const onEdgesChange = (changes) => setEdges((eds) => applyEdgeChanges(changes, eds));
+  const [
+    flowState,
+    {
+      set: setFlowState,
+      reset: resetFlowState,
+      undo: undoFlowState,
+      redo: redoFlowState,
+      canUndo,
+      canRedo,
+    },
+  ] = useUndo({ nodes: [], edges: [] });
+
+  const { nodes, edges } = flowState.present;
+  const setNodes = (newNodes) => setFlowState({ ...flowState.present, nodes: newNodes });
+  const setEdges = (newEdges) => setFlowState({ ...flowState.present, edges: newEdges });
+
+  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
+  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
   const [currentFlowId, setCurrentFlowId] = useState(null);
@@ -67,30 +83,28 @@ const AppComponent = () => {
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
 
   const handleRestore = (version) => {
-    setNodes(version.nodes);
-    setEdges(version.edges);
+    resetFlowState(version);
     setIsHistoryPanelOpen(false);
     setNotification({ message: 'Flow restored!', type: 'success' });
   };
 
   const handleReset = () => {
     const startNode = nodes.find(node => node.type === 'start');
-    setNodes(startNode ? [startNode] : []);
-    setEdges([]);
+    resetFlowState({ nodes: startNode ? [startNode] : [], edges: [] });
     setIsResetModalOpen(false);
     setNotification({ message: 'Canvas reset!', type: 'success' });
   };
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(
+      nodes.map((node) => {
         if (node.id === nodeId) {
           return { ...node, data: { ...node.data, ...newData } };
         }
         return node;
       })
     );
-  }, [setNodes]);
+  }, [nodes, setNodes]);
 
 
   const nodesWithDataHandlers = useMemo(() => {
@@ -113,14 +127,13 @@ const AppComponent = () => {
             edges: [],
         });
         const newFlow = response.data;
-        setNodes(newFlow.nodes);
-        setEdges(newFlow.edges);
+        resetFlowState({ nodes: newFlow.nodes, edges: newFlow.edges });
         setFlowName(newFlow.name);
         setCurrentFlowId(newFlow._id);
     } catch (error) {
         console.error("Error creating new flow:", error);
     }
-  }, [setNodes, setEdges, setFlowName, setCurrentFlowId]);
+  }, [resetFlowState, setFlowName, setCurrentFlowId]);
 
 
   useEffect(() => {
@@ -130,8 +143,7 @@ const AppComponent = () => {
         const response = await axios.get(API_URL);
         if (response.data && response.data.length > 0) {
           const firstFlow = response.data[0];
-          setNodes(firstFlow.nodes || []);
-          setEdges(firstFlow.edges || []);
+          resetFlowState({ nodes: firstFlow.nodes || [], edges: firstFlow.edges || [] });
           setFlowName(firstFlow.name || 'Untitled Flow');
           setCurrentFlowId(firstFlow._id);
           id = firstFlow.nodes.length + 1;
@@ -145,7 +157,7 @@ const AppComponent = () => {
       }
     };
     fetchInitialFlow();
-  }, [setNodes, setEdges, createNewFlow]);
+  }, [resetFlowState, createNewFlow]);
 
   // Effect to update edge labels when a condition node's data changes
   useEffect(() => {
@@ -177,8 +189,8 @@ const AppComponent = () => {
             newEdge.label = keyword || `[Connect to save keyword]`;
         }
     }
-    setEdges((eds) => addEdge(newEdge, eds));
-    }, [nodes, setEdges]);
+    setEdges(addEdge(newEdge, edges));
+    }, [nodes, edges, setEdges]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -207,23 +219,13 @@ const AppComponent = () => {
         data: initialData,
       };
 
-      setNodes((nds) => nds.concat(newNode));
+      setNodes(nodes.concat(newNode));
     },
-    [reactFlowInstance, setNodes],
+    [reactFlowInstance, nodes, setNodes],
   );
 
   const onPaneContextMenu = (event) => {
     event.preventDefault();
-    const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    setMenu({
-      id: getId(),
-      top: event.clientY,
-      left: event.clientX,
-      data: { position }
-    });
-  };
-
-  const onPaneDoubleClick = (event) => {
     const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setMenu({
       id: getId(),
@@ -251,7 +253,7 @@ const AppComponent = () => {
       position,
       data: { label: `${type} node` },
     };
-    setNodes((nds) => nds.concat(newNode));
+    setNodes(nodes.concat(newNode));
     setMenu(null);
   };
 
@@ -316,10 +318,10 @@ const AppComponent = () => {
             <div ref={reactFlowWrapper} className={`flex-grow relative cursor-grab active:cursor-grabbing ${isSimulatorOpen ? 'simulator-open' : ''}`}>
               <div className="header-controls flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
                 <div className="flex items-center gap-1">
-                  <button disabled className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                  <button onClick={undoFlowState} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">undo</span>
                   </button>
-                  <button disabled className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                  <button onClick={redoFlowState} disabled={!canRedo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
                     <span className="material-symbols-outlined text-lg">redo</span>
                   </button>
                 </div>
@@ -348,7 +350,7 @@ const AppComponent = () => {
               </div>
               <ReactFlow
                 nodes={nodesWithDataHandlers}
-                edges={edges.present}
+                edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
@@ -392,7 +394,7 @@ const AppComponent = () => {
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">record_voice_over</span>
                         <span>Speak</span>
                       </button>
-                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-full" onClick={() => onSelect('listen')}>
+                      <button className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-light dark:text-on-surface-dark hover:bg-slate-100 dark:hover:bg-slate-700 w-all" onClick={() => onSelect('listen')}>
                         <span className="material-symbols-outlined text-lg text-muted-light dark:text-muted-dark">hearing</span>
                         <span>Listen</span>
                       </button>
