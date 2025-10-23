@@ -1,23 +1,31 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 
-const LoopNode = ({ data, selected }) => {
+const LoopNode = ({ data, id, selected }) => {
+  const { condition = '', updateNodeData } = data;
+
+  const handleConditionChange = (e) => {
+    if (updateNodeData) {
+      updateNodeData(id, { ...data, condition: e.target.value });
+    }
+  };
+
   return (
-    <div className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer z-10 w-64 ${selected ? 'border-primary ring-4 ring-primary/20' : ''}`}>
+    <div className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border-2 cursor-pointer z-10 w-64 ${selected ? 'border-primary' : 'border-slate-200 dark:border-slate-700'}`}>
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-primary text-2xl">repeat</span>
         <span className="font-semibold text-sm">While Loop</span>
       </div>
       <div className="space-y-3 pt-3 border-t border-border-light dark:border-border-dark">
         <div>
-          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="condition">Condition</label>
+          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor={`condition-${id}`}>Condition</label>
           <input
-            className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
-            id="condition"
+            className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-slate-100 dark:bg-slate-700 focus:ring-1 focus:ring-primary"
+            id={`condition-${id}`}
             placeholder="e.g., my_variable < 10"
             type="text"
-            defaultValue={data.condition}
-            onChange={(e) => data.onChange({ ...data, condition: e.target.value })}
+            value={condition}
+            onChange={handleConditionChange}
           />
         </div>
       </div>

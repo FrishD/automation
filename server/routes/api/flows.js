@@ -38,6 +38,7 @@ router.post('/', async (req, res) => {
 // @desc    Update a flow
 // @access  Public
 router.put('/:id', async (req, res) => {
+  console.log('Received data for flow update:', JSON.stringify(req.body, null, 2));
   try {
     const flow = await Flow.findByIdAndUpdate(
       req.params.id,

@@ -9,13 +9,36 @@ import time
 import traceback
 import asyncio
 import edge_tts
+from langdetect import detect, DetectorFactory
+from langdetect.lang_detect_exception import LangDetectException
+import re
+import dateparser
 
 # --- Configuration ---
 API_BASE_URL = "http://localhost:5000/api/flows"
 FLOW_ID = None
+# Ensure consistent detection results
+DetectorFactory.seed = 0
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
+
+# --- Entity Extraction ---
+def extract_entity(text, entity_type):
+    """Extracts a specific entity type from the text."""
+    if entity_type == 'full_text':
+        return text
+    if entity_type == 'number':
+        match = re.search(r'\d+', text)
+        return match.group(0) if match else None
+    if entity_type == 'email':
+        match = re.search(r'[\w\.-]+@[\w\.-]+', text)
+        return match.group(0) if match else None
+    if entity_type == 'date':
+        # Use dateparser, preferring dates in the future
+        parsed_date = dateparser.parse(text, settings={'PREFER_DATES_FROM': 'future'})
+        return parsed_date.strftime('%Y-%m-%d') if parsed_date else None
+    return None
 
 # --- Helper Functions ---
 def speak(text):
@@ -23,11 +46,21 @@ def speak(text):
     try:
         print(f"🤖 Agent: {text}")
 
-        # Detect language - use Hebrew voice for Hebrew text, English for English
-        if any('\u0590' <= c <= '\u05FF' for c in text):
-            voice = "he-IL-HilaNeural"
-        else:
-            voice = "en-US-AriaNeural"
+        # Detect language for TTS voice selection
+        try:
+            lang = detect(text)
+            print(f"🌍 Detected language: {lang}")
+            if lang == 'he':
+                voice = "he-IL-HilaNeural"
+            else:
+                voice = "en-US-AriaNeural"
+        except LangDetectException:
+            print("⚠️  Language detection failed. Falling back to character-based detection.")
+            # Fallback for very short texts or detection errors
+            if any('\u0590' <= c <= '\u05FF' for c in text):
+                voice = "he-IL-HilaNeural"
+            else:
+                voice = "en-US-AriaNeural"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
             temp_file = fp.name
@@ -43,13 +76,18 @@ def speak(text):
     except Exception as e:
         print(f"❌ Error in text-to-speech: {e}")
 
-def listen_for_command(model):
+def listen_for_command(model, language='he'):
     """Listens for a command from the user and returns it as text."""
     r = sr.Recognizer()
+    # Increase energy threshold to make it more sensitive
+    r.energy_threshold = 4000
     with sr.Microphone() as source:
-        print("\n🎤 Listening...")
+        print(f"\n🎤 Listening... (Language: {language})")
         r.pause_threshold = 1.5
+        # Adjust for ambient noise to improve accuracy
+        print("    (Calibrating for ambient noise...)")
         r.adjust_for_ambient_noise(source, duration=1)
+        print("    (Calibration complete. Speak now.)")
         audio = r.listen(source)
 
     try:
@@ -58,7 +96,8 @@ def listen_for_command(model):
         with open(temp_audio_path, "wb") as f:
             f.write(audio.get_wav_data())
 
-        result = model.transcribe(temp_audio_path, fp16=False)
+        # Pass the language to Whisper for better accuracy
+        result = model.transcribe(temp_audio_path, language=language, fp16=False)
         command = result["text"]
 
         print(f"👤 User said: {command}")
@@ -75,6 +114,7 @@ class ConversationEngine:
         self.nodes = {node['id']: node for node in flow_data['nodes']}
         self.edges = flow_data['edges']
         self.whisper_model = whisper_model
+        self.variables = {}  # Store conversation variables
         self.current_node_id = self._get_node_by_type('start')
 
         if not self.current_node_id:
@@ -88,6 +128,31 @@ class ConversationEngine:
             if node['type'] == node_type:
                 return node_id
         return None
+
+    def _replace_variables(self, text):
+        """Replaces {variable_name} placeholders with stored variable values."""
+        print(f"  🔍 Replacing variables in text: '{text}'")
+        print(f"  - Available variables: {self.variables}")
+        original_text = text
+        for var_name, var_value in self.variables.items():
+            if not var_name: continue
+            # Use a robust regex to replace {  var_name  } placeholders
+            # It handles whitespace and escapes the variable name for safety
+            pattern = r'\{\s*' + re.escape(var_name.strip()) + r'\s*\}'
+            # Ensure the replacement value is a string
+            replacement = str(var_value if var_value is not None else '')
+
+            pre_replace_text = text
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            if pre_replace_text != text:
+                print(f"    ✅ Replaced '{{{var_name}}}' with '{replacement}'")
+
+        if original_text == text:
+            print("  - No variables were replaced.")
+        else:
+            print(f"  - Final text: '{text}'")
+
+        return text
 
     def _find_next_node_id(self, source_node_id, source_handle=None):
         for edge in self.edges:
@@ -134,19 +199,82 @@ class ConversationEngine:
                     print("⚠️  Warning: No meaningful text configured for speak node")
                     text_to_speak = "אין טקסט מוגדר"
 
-                speak(text_to_speak)
+                final_text = self._replace_variables(text_to_speak)
+                speak(final_text)
                 time.sleep(0.5)
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
-                user_input_from_listen = listen_for_command(self.whisper_model)
-                print(f"💾 Stored user input: '{user_input_from_listen}'")
+                language = node_data.get('language', 'he')
+                retries = int(node_data.get('retries', 1))
 
-                if "סיים שיחה" in user_input_from_listen:
-                    speak("מסיים את השיחה. להתראות!")
+                # Find variable nodes that are children of this listen node
+                child_variable_nodes = [
+                    n for n in self.nodes.values()
+                    if n.get('parentNode') == self.current_node_id and n.get('type') == 'variable'
+                ]
+
+                user_input_from_listen = ""
+                all_entities_found = False
+
+                for attempt in range(retries):
+                    user_input_from_listen = listen_for_command(self.whisper_model, language=language)
+                    if "סיים שיחה" in user_input_from_listen:
+                        speak("מסיים את השיחה. להתראות!")
+                        self.current_node_id = None
+                        break
+
+                    # If there are no variable nodes, save the full text to a default variable
+                    if not child_variable_nodes:
+                        if user_input_from_listen:
+                            self.variables['last_utterance'] = user_input_from_listen
+                            print(f"  ✅ Stored full text to 'last_utterance': {user_input_from_listen}")
+                            all_entities_found = True
+                        break
+
+                    # --- Entity Extraction Logic ---
+                    found_entities_count = 0
+                    for var_node in child_variable_nodes:
+                        var_data = var_node.get('data', {})
+                        var_name = var_data.get('variableName')
+                        entity_type = var_data.get('entityType', 'full_text')
+
+                        if not var_name:
+                            continue
+
+                        # Always save the full text if the type is 'full_text'
+                        if entity_type == 'full_text':
+                            self.variables[var_name] = user_input_from_listen
+                            print(f"  ✅ Extracted '{var_name}' (full_text): {user_input_from_listen}")
+                            found_entities_count += 1
+                            continue
+
+                        # For other entity types, try to extract
+                        extracted_value = extract_entity(user_input_from_listen, entity_type)
+                        if extracted_value:
+                            self.variables[var_name] = extracted_value
+                            print(f"  ✅ Extracted '{var_name}' ({entity_type}): {extracted_value}")
+                            found_entities_count += 1
+                        else:
+                            print(f"  ❌ Could not extract '{var_name}' ({entity_type}) from '{user_input_from_listen}'")
+                            self.variables[var_name] = None # Explicitly set to None
+
+                    if found_entities_count == len(child_variable_nodes):
+                        all_entities_found = True
+                        break
+
+                    if attempt < retries - 1:
+                        speak("לא הצלחתי להבין. בוא ננסה שוב.")
+
+                if not self.current_node_id: # Exit if conversation was ended
                     break
 
+                if not all_entities_found:
+                    print("⚠️  Failed to extract all required entities after all retries.")
+
+                print(f"💾 Stored variables: {self.variables}")
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
+
 
             elif node_type == 'condition':
                 conditions = node_data.get('conditions', [])
@@ -249,7 +377,7 @@ if __name__ == "__main__":
         # Load the whisper model
         print("\n🔄 Loading Whisper speech recognition model...")
         print("⏳ This may take a minute on first run...")
-        whisper_model = whisper.load_model("base")
+        whisper_model = whisper.load_model("tiny")
         print("✅ Whisper model loaded successfully\n")
 
         # Create and run the conversation engine

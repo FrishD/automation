@@ -1,20 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 
-const ConditionNode = ({ data }) => {
+const ConditionNode = ({ data, id }) => {
+    // Use state to manage conditions, but sync with props
     const [conditions, setConditions] = useState(data.conditions || [{ keyword: '' }]);
+
+    useEffect(() => {
+        // If the data from the flow changes, update the internal state
+        setConditions(data.conditions || [{ keyword: '' }]);
+    }, [data.conditions]);
 
     const handleConditionChange = (index, value) => {
         const newConditions = [...conditions];
         newConditions[index] = { ...newConditions[index], keyword: value };
         setConditions(newConditions);
-        data.onChange({ ...data, conditions: newConditions });
+        if (data.updateNodeData) {
+            data.updateNodeData(id, { ...data, conditions: newConditions });
+        }
     };
 
     const addCondition = () => {
         const newConditions = [...conditions, { keyword: '' }];
         setConditions(newConditions);
-        data.onChange({ ...data, conditions: newConditions });
+        if (data.updateNodeData) {
+            data.updateNodeData(id, { ...data, conditions: newConditions });
+        }
     };
 
     return (
