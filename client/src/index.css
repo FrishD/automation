@@ -47,33 +47,33 @@ code {
   --reactour-text: #e2e8f0;
 }
 
-div[id^="react-joyride-step-"] {
+.reactour__popover {
   font-family: 'Roboto', sans-serif;
-  padding: 24px !important;
+  padding: 24px;
 }
 
-div[id^="react-joyride-step-"] h2 {
-  font-size: 1.25rem !important;
-  font-weight: 700 !important;
-  margin-bottom: 8px !important;
+.reactour__popover h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 8px;
 }
 
-div[id^="react-joyride-step-"] button {
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-  padding: 8px 16px !important;
+.reactour__popover button {
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 8px 16px;
   transition: background-color 0.2s ease-in-out;
 }
 
-div[id^="react-joyride-step-"] button[title="Close"] {
-  color: #94a3b8 !important;
-  background-color: transparent !important;
+.reactour__popover button[aria-label="Close"] {
+  color: #94a3b8;
+  background-color: transparent;
 }
 
-div[id^="react-joyride-step-"] button[title="Close"]:hover {
-  background-color: #f1f5f9 !important;
+.reactour__popover button[aria-label="Close"]:hover {
+  background-color: #f1f5f9;
 }
 
-.dark div[id^="react-joyride-step-"] button[title="Close"]:hover {
-  background-color: #334155 !important;
+.dark .reactour__popover button[aria-label="Close"]:hover {
+  background-color: #334155;
 }

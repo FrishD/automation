@@ -1,8 +1,4 @@
 .react-flow__node.highlighted {
-  box-shadow: 0 0 0 3px #818cf8, 0 0 20px 5px #c4b5fd;
-  transition: box-shadow 0.3s ease-in-out;
-}
-
-.react-flow__node {
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.8), 0 0 20px 10px rgba(196, 181, 253, 0.6);
   transition: box-shadow 0.3s ease-in-out;
 }

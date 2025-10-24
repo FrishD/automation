@@ -46,9 +46,6 @@ def speak(text):
 
         loop.run_until_complete(create_speech())
 
-        # Use a separate library for playback that doesn't conflict with asyncio
-        # For simplicity, we'll keep playsound for now, but in a real-world scenario
-        # you might need a different approach if it causes blocking issues.
         from playsound3 import playsound
         playsound(temp_file)
         os.remove(temp_file)
@@ -69,7 +66,7 @@ def listen_for_command(model):
         audio = r.listen(source)
 
     try:
-        send_message({"type": "status_update", "status": "calculating", "subtitle": "Transcribing audio..."})
+        send_message({"type": "status_update", "status": "recognizing", "subtitle": "Transcribing audio..."})
         temp_audio_path = "temp_audio.wav"
         with open(temp_audio_path, "wb") as f:
             f.write(audio.get_wav_data())
@@ -143,9 +140,6 @@ class ConversationEngine:
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'condition':
-                send_message({"type": "status_update", "status": "thinking", "subtitle": "Evaluating conditions..."})
-                time.sleep(1) # Simulate thinking
-
                 conditions = node_data.get('conditions', [])
                 next_node_found = False
                 for i, condition in enumerate(conditions):
@@ -157,26 +151,16 @@ class ConversationEngine:
 
                 if not next_node_found:
                     speak("I didn't understand. Could you please repeat?")
-                    # This logic needs refinement. How do we return to the *correct* listen node?
-                    # For now, we assume one listen node or the most recent one.
-                    # A better approach would be to track the conversation path.
                     listen_nodes = [nid for nid, n in self.nodes.items() if n['type'] == 'listen']
                     if listen_nodes:
-                        self.current_node_id = listen_nodes[-1] # Go to the last listen node
+                        self.current_node_id = listen_nodes[-1]
                     else:
-                        break # End if no listen node to go back to
+                        break
 
             elif node_type == 'end':
                 end_text = node_data.get('text', 'Conversation ended.')
                 speak(end_text)
                 self.current_node_id = None
-
-            # New node types for status simulation
-            elif node_type == 'summons_creator': # Placeholder for a custom node
-                send_message({"type": "status_update", "status": "Summoning Creator", "subtitle": "Please wait..."})
-                time.sleep(2)
-                speak("The creator has been summoned.")
-                self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             else:
                 send_message({"type": "error", "message": f"Unknown node type: {node_type}"})
