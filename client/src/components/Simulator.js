@@ -9,33 +9,45 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
 
   useEffect(() => {
     if (isOpen && currentFlowId) {
+      console.log('[WebSocket] Attempting to connect...');
       const socket = new WebSocket('ws://localhost:5000');
       ws.current = socket;
 
       socket.onopen = () => {
+        console.log('[WebSocket] Connection successful. Sending start_simulation...');
         socket.send(JSON.stringify({ type: 'start_simulation', flowId: currentFlowId }));
       };
 
       socket.onmessage = (event) => {
+        console.log('[WebSocket] Message received:', event.data);
         const message = JSON.parse(event.data);
 
         if (message.type === 'node_active') {
+          console.log('[Simulator] Highlighting node:', message.nodeId);
           onNodeHighlight(message.nodeId);
         }
 
         if (message.type === 'status_update') {
+          console.log(`[Simulator] Status update: ${message.status}, Subtitle: ${message.subtitle || ''}`);
           setStatus(message.status);
           setSubtitle(message.subtitle || '');
         }
 
         if (message.type === 'speak_start') {
+          console.log('[Simulator] Animation started.');
           setIsAnimating(true);
         } else if (message.type === 'speak_end') {
+          console.log('[Simulator] Animation stopped.');
           setIsAnimating(false);
         }
       };
 
-      socket.onclose = () => {
+      socket.onerror = (error) => {
+        console.error('[WebSocket] Error:', error);
+      };
+
+      socket.onclose = (event) => {
+        console.log(`[WebSocket] Connection closed. Code: ${event.code}, Reason: ${event.reason}`);
         onNodeHighlight(null);
         setStatus('Finished');
         setSubtitle('');
@@ -43,6 +55,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       };
 
       return () => {
+        console.log('[WebSocket] Cleanup: Closing connection.');
         if (ws.current) {
           ws.current.close();
         }
