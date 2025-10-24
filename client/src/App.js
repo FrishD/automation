@@ -9,6 +9,7 @@ import ReactFlow, {
   applyEdgeChanges,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import './App.css';
 import axios from 'axios';
 import Sidebar from './components/Sidebar.js';
 import useUndo from 'use-undo';
@@ -28,7 +29,7 @@ import Notification from './components/Notification.js';
 import Modal from './components/Modal.js';
 import { TourProvider } from '@reactour/tour';
 import Simulator from './components/Simulator.js';
-import HistoryPanel from './components/HistoryPanel.js';
+import HistoryModal from './components/HistoryModal.js';
 import Tour from './components/Tour.js';
 
 
@@ -306,16 +307,16 @@ const AppComponent = () => {
           currentFlowId={currentFlowId}
           onNodeHighlight={setHighlightedNode}
         />
-        <HistoryPanel
+        <HistoryModal
           isOpen={isHistoryPanelOpen}
           onClose={() => setIsHistoryPanelOpen(false)}
           currentFlowId={currentFlowId}
           onRestore={handleRestore}
         />
-        <Sidebar onReset={() => setIsResetModalOpen(true)} className="sidebar" />
-        <main className="flex-1 bg-background-light dark:bg-background-dark p-6">
-          <div className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col" style={{backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
-            <div ref={reactFlowWrapper} className={`flex-grow relative cursor-grab active:cursor-grabbing ${isSimulatorOpen ? 'simulator-open' : ''}`}>
+        <Sidebar onReset={() => setIsResetModalOpen(true)} />
+        <main className={`flex-1 bg-background-light dark:bg-background-dark p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
+          <div data-tour="canvas" className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col" style={{backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
+            <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
               <div className="header-controls flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">
                 <div className="flex items-center gap-1">
                   <button onClick={undoFlowState} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
@@ -326,20 +327,21 @@ const AppComponent = () => {
                   </button>
                 </div>
                 <input
+                  data-tour="flow-name"
                   type="text"
                   value={flowName}
                   onChange={(e) => setFlowName(e.target.value)}
                   className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
                 />
                 <div className="flex items-center gap-1.5 mr-1">
-                  <button onClick={() => setIsSimulatorOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <button data-tour="simulate-button" onClick={() => setIsSimulatorOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
                     <span className="material-symbols-outlined text-lg">play_circle</span>
                   </button>
-                  <button onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <button data-tour="history-button" onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
                     <span className="material-symbols-outlined text-lg">history</span>
                   </button>
                   <Tour />
-                  <button onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
+                  <button data-tour="save-button" onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
                     <span className="material-symbols-outlined text-base">save</span>
                     <span>Save</span>
                   </button>
@@ -416,16 +418,32 @@ const AppComponent = () => {
 
 const tourSteps = [
   {
-    selector: '.sidebar',
-    content: 'This is the palette. Drag and drop nodes from here to the canvas to build your conversation flow.',
+    selector: '[data-tour="palette"]',
+    content: 'This is the Palette. Drag and drop nodes from here onto the canvas to build your conversation flow.',
   },
   {
-    selector: '.react-flow__pane',
-    content: 'This is the canvas. You can arrange your nodes here.',
+    selector: '[data-tour="canvas"]',
+    content: 'This is the canvas, where you build your flow. Right-click to quickly add nodes. Connect nodes by dragging from the handles.',
   },
   {
-    selector: '.header-controls',
-    content: 'Use these controls to save your flow, undo/redo changes, and more.',
+    selector: '[data-tour="flow-name"]',
+    content: 'You can change the name of your conversation flow here.',
+  },
+  {
+    selector: '[data-tour="save-button"]',
+    content: 'Click here to save your progress.',
+  },
+  {
+    selector: '[data-tour="simulate-button"]',
+    content: 'Use this button to open the simulator and test your conversation.',
+  },
+  {
+    selector: '[data-tour="history-button"]',
+    content: 'Access the version history to view and restore previous versions of your flow.',
+  },
+  {
+    selector: '[data-tour="listen-node-example"]',
+    content: 'In a "Listen" node, you can drag "Variable" nodes inside to capture specific user inputs like names, dates, or numbers.',
   },
 ];
 

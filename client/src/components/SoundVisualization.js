@@ -3,9 +3,9 @@ import './SoundVisualization.css';
 
 const SoundVisualization = ({ isAnimating }) => {
   return (
-    <div className="sound-visualization">
-      {Array.from({ length: 20 }).map((_, i) => (
-        <div key={i} className={`bar ${isAnimating ? 'animating' : ''}`} style={{ '--i': i }} />
+    <div className={`sound-visualization ${isAnimating ? 'animating' : ''}`}>
+      {Array.from({ length: 15 }).map((_, i) => (
+        <div key={i} className="bar" style={{ '--i': i }} />
       ))}
     </div>
   );

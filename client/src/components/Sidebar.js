@@ -50,7 +50,7 @@ const Sidebar = ({ onReset, className }) => {
   }, {});
 
   return (
-    <aside className={`w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col ${className}`}>
+    <aside data-tour="palette" className={`w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col ${className}`}>
         <div className="p-4 border-b border-border-light dark:border-border-dark">
             <h1 className="text-lg font-bold text-on-surface-light dark:text-on-surface-dark">Palette</h1>
         </div>
