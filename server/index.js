@@ -46,17 +46,24 @@ wss.on('connection', (ws) => {
       pythonProcess.stdin.write(JSON.stringify(flowData));
       pythonProcess.stdin.end();
 
+      let buffer = '';
       pythonProcess.stdout.on('data', (data) => {
-        const output = data.toString();
-        try {
-          // Check if the output is the JSON for active_node
-          const jsonData = JSON.parse(output);
-          if (jsonData.type === 'active_node') {
-            ws.send(JSON.stringify(jsonData));
+        buffer += data.toString();
+        const messages = buffer.split('\n');
+        buffer = messages.pop(); // The last part might be incomplete, save it.
+
+        for (const message of messages) {
+          if (message.trim() === '') continue;
+          try {
+            // The message from python is a self-contained JSON string.
+            // We don't need to parse it and re-stringify it, we can just check if it's valid
+            // and forward it. The client is expecting a string anyway.
+            JSON.parse(message); // This will throw if `message` is not valid JSON
+            ws.send(message); // Forward the original, valid JSON string
+          } catch (e) {
+            console.error('Could not parse simulator output line as JSON:', message);
+            // Avoid sending malformed data to the client
           }
-        } catch (e) {
-          // If it's not JSON, it's a regular log
-          ws.send(JSON.stringify({ type: 'log', data: output }));
         }
       });
 
