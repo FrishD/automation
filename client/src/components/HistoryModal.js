@@ -46,10 +46,10 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
                 <div key={`${version.timestamp}-${index}`} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
                   <div>
                     <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
-                      {new Date(version.timestamp).toLocaleString('en-US', {
+                      {version.timestamp ? new Date(version.timestamp).toLocaleString('en-US', {
                         dateStyle: 'medium',
                         timeStyle: 'short',
-                      })}
+                      }) : 'Invalid Date'}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {version.nodes.length} nodes, {version.edges.length} edges

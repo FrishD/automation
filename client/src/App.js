@@ -65,11 +65,11 @@ const AppComponent = () => {
   ] = useUndo({ nodes: [], edges: [] });
 
   const { nodes, edges } = flowState.present;
-  const setNodes = (newNodes) => setFlowState({ ...flowState.present, nodes: newNodes });
-  const setEdges = (newEdges) => setFlowState({ ...flowState.present, edges: newEdges });
+  const setNodes = useCallback((newNodes) => setFlowState({ ...flowState.present, nodes: newNodes }), [flowState.present, setFlowState]);
+  const setEdges = useCallback((newEdges) => setFlowState({ ...flowState.present, edges: newEdges }), [flowState.present, setFlowState]);
 
-  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
-  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+  const onNodesChange = useCallback((changes) => setNodes(applyNodeChanges(changes, nodes)), [nodes, setNodes]);
+  const onEdgesChange = useCallback((changes) => setEdges(applyEdgeChanges(changes, edges)), [edges, setEdges]);
 
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import CircularWaveform from './CircularWaveform';
 
 const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
@@ -45,7 +45,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
     }
   }, [isOpen]);
 
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     if (isRecording) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -71,14 +71,14 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       console.error("Error accessing microphone:", err);
       // Handle permission denied or other errors
     }
-  };
+  }, [isRecording]);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (mediaRecorder.current && isRecording) {
       mediaRecorder.current.stop();
       setIsRecording(false);
     }
-  };
+  }, [isRecording]);
 
   useEffect(() => {
     if (status === 'listening') {
@@ -86,7 +86,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
     } else {
       stopRecording();
     }
-  }, [status]);
+  }, [status, startRecording, stopRecording]);
 
 
   useEffect(() => {
