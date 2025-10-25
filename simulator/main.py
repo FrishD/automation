@@ -61,8 +61,16 @@ def listen_for_command(model):
     send_message({"type": "status_update", "status": "listening", "subtitle": "Say something..."})
 
     try:
-        # Read the raw audio data from stdin
-        audio_data = sys.stdin.buffer.read()
+        # Read binary data line by line
+        audio_chunks = []
+        while True:
+            line = sys.stdin.buffer.readline()
+            if line.endswith(b'\\n'):
+                audio_chunks.append(line[:-2]) # Remove delimiter
+                break
+            audio_chunks.append(line)
+
+        audio_data = b"".join(audio_chunks)
 
         if not audio_data:
             send_message({"type": "error", "message": "No audio data received."})

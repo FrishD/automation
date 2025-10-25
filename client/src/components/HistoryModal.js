@@ -10,8 +10,10 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
     if (isOpen && currentFlowId) {
       const fetchHistory = async () => {
         try {
-          const response = await axios.get(`${API_URL}/${currentFlowId}/history`);
-          setHistory(response.data);
+          // The API returns a single flow object with a 'history' array
+          const response = await axios.get(`${API_URL}/${currentFlowId}`);
+          // We need to reverse the history to show the newest first
+          setHistory(response.data.history.slice().reverse());
         } catch (error) {
           console.error('Error fetching history:', error);
         }
@@ -24,27 +26,27 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all duration-300 scale-95 opacity-0 animate-fade-in-scale"
+        className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg m-4 animate-fade-in-scale"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center pb-4 border-b border-border-light dark:border-border-dark">
           <h2 className="text-xl font-bold text-on-surface-light dark:text-on-surface-dark">Version History</h2>
-          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
-            <span className="material-symbols-outlined text-lg">close</span>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+            <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto pr-4 -mr-4">
+        <div className="max-h-[60vh] overflow-y-auto mt-6 pr-2">
           {history.length > 0 ? (
             <div className="space-y-3">
-              {history.map((version, index) => (
-                <div key={version.updatedAt} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
+              {history.map((version) => (
+                <div key={version.timestamp} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
                   <div>
                     <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
-                      {new Date(version.updatedAt).toLocaleString('en-US', {
+                      {new Date(version.timestamp).toLocaleString('en-US', {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       })}
@@ -55,7 +57,7 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
                   </div>
                   <button
                     onClick={() => onRestore(version)}
-                    className="opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300 px-3 py-1 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90"
+                    className="opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90"
                   >
                     Restore
                   </button>

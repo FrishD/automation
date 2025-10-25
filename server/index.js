@@ -91,7 +91,7 @@ wss.on('connection', (ws) => {
         if (pythonProcess && pythonProcess.stdin.writable) {
             // Forward the audio data to the Python script's stdin
             pythonProcess.stdin.write(message);
-            // DO NOT end stdin here; the script might need to listen again.
+            pythonProcess.stdin.write('\\n'); // Add newline as delimiter
         }
     }
   });
