@@ -42,8 +42,8 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
         <div className="max-h-[60vh] overflow-y-auto mt-6 pr-2">
           {history.length > 0 ? (
             <div className="space-y-3">
-              {history.map((version) => (
-                <div key={version.timestamp} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
+              {history.map((version, index) => (
+                <div key={`${version.timestamp}-${index}`} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
                   <div>
                     <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
                       {new Date(version.timestamp).toLocaleString('en-US', {

@@ -61,19 +61,15 @@ def listen_for_command(model):
     send_message({"type": "status_update", "status": "listening", "subtitle": "Say something..."})
 
     try:
-        # Read binary data line by line
-        audio_chunks = []
-        while True:
-            line = sys.stdin.buffer.readline()
-            if line.endswith(b'\\n'):
-                audio_chunks.append(line[:-2]) # Remove delimiter
-                break
-            audio_chunks.append(line)
+        header = sys.stdin.readline().strip()
+        if not header.startswith('--AUDIO--'):
+            raise ValueError(f"Invalid audio header received: {header}")
 
-        audio_data = b"".join(audio_chunks)
+        audio_length = int(header.split('--AUDIO--')[1])
+        audio_data = sys.stdin.buffer.read(audio_length)
 
         if not audio_data:
-            send_message({"type": "error", "message": "No audio data received."})
+            send_message({"type": "error", "message": "No audio data received despite header."})
             return ""
 
         send_message({"type": "status_update", "status": "recognizing", "subtitle": "Transcribing audio..."})
@@ -184,13 +180,19 @@ class ConversationEngine:
 
 if __name__ == "__main__":
     try:
-        # The first line is always the flow data
-        flow_data_string = sys.stdin.readline()
+        # Read the header line which contains the length of the JSON data
+        header = sys.stdin.readline().strip()
+        if not header:
+            raise ValueError("Did not receive data header.")
+
+        json_length = int(header)
+
+        # Read the exact number of bytes for the JSON data
+        flow_data_string = sys.stdin.buffer.read(json_length).decode('utf-8')
         if not flow_data_string:
             raise ValueError("No flow data received from stdin.")
-        flow = json.loads(flow_data_string)
 
-        # The rest of stdin will be treated as audio input by listen_for_command
+        flow = json.loads(flow_data_string)
 
     except Exception as e:
         send_message({"type": "error", "message": f"Error reading flow data from stdin: {e}"})

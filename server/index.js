@@ -79,8 +79,13 @@ wss.on('connection', (ws) => {
                     ws.close();
                 });
 
-                // Send flow data as a single line, followed by a newline to signal end of initial data
-                pythonProcess.stdin.write(JSON.stringify(flowData) + '\\n');
+                const flowDataString = JSON.stringify(flowData);
+                const dataLength = Buffer.byteLength(flowDataString, 'utf-8');
+
+                // Send a simple header: the byte length of the data followed by a newline
+                pythonProcess.stdin.write(`${dataLength}\\n`);
+                // Send the actual data
+                pythonProcess.stdin.write(flowDataString);
             }
         } catch (error) {
             console.error('Failed to process incoming message:', error);
@@ -89,9 +94,11 @@ wss.on('connection', (ws) => {
     // If the message is binary data, it's our audio blob
     } else if (message instanceof Buffer) {
         if (pythonProcess && pythonProcess.stdin.writable) {
-            // Forward the audio data to the Python script's stdin
+            const audioLength = message.length;
+            // Send header for the audio data
+            pythonProcess.stdin.write(`--AUDIO--${audioLength}\\n`);
+            // Send the actual audio data
             pythonProcess.stdin.write(message);
-            pythonProcess.stdin.write('\\n'); // Add newline as delimiter
         }
     }
   });
