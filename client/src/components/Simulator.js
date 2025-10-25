@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import CircularWaveform from './CircularWaveform';
 
 const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
+  console.log(`DEBUG: Simulator rendering. isOpen: ${isOpen}`);
   const [isAnimating, setIsAnimating] = useState(false);
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState('Idle');
@@ -14,27 +15,25 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   const audioContext = useRef(null);
 
   useEffect(() => {
-    // Initialize AudioContext on the first component mount
     if (!audioContext.current) {
       audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
     }
   }, []);
 
-  const playBloop = () => {
+  const playBloop = useCallback(() => {
     if (!audioContext.current) return;
+    console.log("DEBUG: Playing bloop sound");
     const oscillator = audioContext.current.createOscillator();
     const gainNode = audioContext.current.createGain();
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.current.destination);
-
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(300, audioContext.current.currentTime);
     gainNode.gain.setValueAtTime(0.5, audioContext.current.currentTime);
-
     gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.current.currentTime + 0.3);
     oscillator.start();
     oscillator.stop(audioContext.current.currentTime + 0.3);
-  };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,65 +42,73 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
     } else {
       setIsOpening(false);
     }
-  }, [isOpen]);
+  }, [isOpen, playBloop]);
 
-  const startRecording = async () => {
-    if (isRecording) return;
+  const startRecording = useCallback(async () => {
+    console.log("DEBUG: Attempting to start recording...");
+    if (isRecording) {
+      console.log("DEBUG: Already recording.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder.current = new MediaRecorder(stream);
       audioChunks.current = [];
 
-      mediaRecorder.current.addEventListener("dataavailable", event => {
+      mediaRecorder.current.ondataavailable = event => {
         audioChunks.current.push(event.data);
-      });
+      };
 
-      mediaRecorder.current.addEventListener("stop", () => {
+      mediaRecorder.current.onstop = () => {
+        console.log("DEBUG: Recording stopped.");
         const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+          console.log("DEBUG: Sending audio blob.");
           ws.current.send(audioBlob);
         }
-        // Stop the media stream tracks to turn off the mic indicator
         stream.getTracks().forEach(track => track.stop());
-      });
+      };
 
       mediaRecorder.current.start();
       setIsRecording(true);
+      console.log("DEBUG: Recording started.");
     } catch (err) {
       console.error("Error accessing microphone:", err);
-      // Handle permission denied or other errors
     }
-  };
+  }, [isRecording]);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (mediaRecorder.current && isRecording) {
+      console.log("DEBUG: Stopping recording.");
       mediaRecorder.current.stop();
       setIsRecording(false);
     }
-  };
+  }, [isRecording]);
 
   useEffect(() => {
+    console.log(`DEBUG: Status is now ${status}.`);
     if (status === 'listening') {
       startRecording();
     } else {
       stopRecording();
     }
-  }, [status]);
-
+  }, [status, startRecording, stopRecording]);
 
   useEffect(() => {
     if (isOpen && currentFlowId) {
+      console.log("DEBUG: Setting up WebSocket connection...");
       setLogs([]);
       const socket = new WebSocket('ws://localhost:5000');
       ws.current = socket;
 
       socket.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('DEBUG: WebSocket connected.');
         socket.send(JSON.stringify({ type: 'start_simulation', flowId: currentFlowId }));
       };
 
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
+        console.log("DEBUG: WebSocket message received:", message);
         setLogs((prevLogs) => [...prevLogs, message]);
 
         if (message.type === 'status_update') {
@@ -120,13 +127,14 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         }
       };
 
-      socket.onclose = () => {
-        console.log('WebSocket disconnected');
+      socket.onclose = (event) => {
+        console.log(`DEBUG: WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
         onNodeHighlight(null);
         setStatus('Finished');
       };
 
       return () => {
+        console.log("DEBUG: Closing WebSocket connection.");
         socket.close();
       };
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api/flows';
@@ -10,10 +10,10 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
     if (isOpen && currentFlowId) {
       const fetchHistory = async () => {
         try {
-          // The API returns a single flow object with a 'history' array
+          console.log(`DEBUG: Fetching history for flow ${currentFlowId}`);
           const response = await axios.get(`${API_URL}/${currentFlowId}`);
-          // We need to reverse the history to show the newest first
-          setHistory(response.data.history.slice().reverse());
+          setHistory(response.data.history ? response.data.history.slice().reverse() : []);
+          console.log("DEBUG: History fetched", response.data.history);
         } catch (error) {
           console.error('Error fetching history:', error);
         }
@@ -21,6 +21,11 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
       fetchHistory();
     }
   }, [isOpen, currentFlowId]);
+
+  const handleRestoreClick = useCallback((version) => {
+    console.log("DEBUG: Restore button clicked for version", version.timestamp);
+    onRestore(version);
+  }, [onRestore]);
 
   if (!isOpen) return null;
 
@@ -42,27 +47,31 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
         <div className="max-h-[60vh] overflow-y-auto mt-6 pr-2">
           {history.length > 0 ? (
             <div className="space-y-3">
-              {history.map((version, index) => (
-                <div key={`${version.timestamp}-${index}`} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
-                  <div>
-                    <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
-                      {new Date(version.timestamp).toLocaleString('en-US', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      {version.nodes.length} nodes, {version.edges.length} edges
-                    </p>
+              {history.map((version, index) => {
+                const date = new Date(version.timestamp);
+                const isValidDate = !isNaN(date.getTime());
+                return (
+                  <div key={`${version.timestamp}-${index}`} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
+                    <div>
+                      <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
+                        {isValidDate ? date.toLocaleString('en-US', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }) : `Invalid Date: ${version.timestamp}`}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {version.nodes.length} nodes, {version.edges.length} edges
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleRestoreClick(version)}
+                      className="opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90"
+                    >
+                      Restore
+                    </button>
                   </div>
-                  <button
-                    onClick={() => onRestore(version)}
-                    className="opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90"
-                  >
-                    Restore
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-8">No history found.</p>

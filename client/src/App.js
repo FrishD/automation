@@ -65,11 +65,24 @@ const AppComponent = () => {
   ] = useUndo({ nodes: [], edges: [] });
 
   const { nodes, edges } = flowState.present;
-  const setNodes = (newNodes) => setFlowState({ ...flowState.present, nodes: newNodes });
-  const setEdges = (newEdges) => setFlowState({ ...flowState.present, edges: newEdges });
 
-  const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
-  const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+  const setNodes = useCallback((newNodes) => {
+    setFlowState(current => ({ ...current, nodes: typeof newNodes === 'function' ? newNodes(current.nodes) : newNodes }));
+  }, [setFlowState]);
+
+  const setEdges = useCallback((newEdges) => {
+    setFlowState(current => ({ ...current, edges: typeof newEdges === 'function' ? newEdges(current.edges) : newEdges }));
+  }, [setFlowState]);
+
+  const onNodesChange = useCallback((changes) => {
+    console.log("DEBUG: onNodesChange triggered", changes);
+    setNodes((nds) => applyNodeChanges(changes, nds));
+  }, [setNodes]);
+
+  const onEdgesChange = useCallback((changes) => {
+    console.log("DEBUG: onEdgesChange triggered", changes);
+    setEdges((eds) => applyEdgeChanges(changes, eds));
+  }, [setEdges]);
 
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [flowName, setFlowName] = useState('Untitled Flow');
@@ -83,29 +96,31 @@ const AppComponent = () => {
   const [highlightedNode, setHighlightedNode] = useState(null);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
 
-  const handleRestore = (version) => {
+  const handleRestore = useCallback((version) => {
+    console.log("DEBUG: Restoring flow version", version);
     resetFlowState(version);
     setIsHistoryPanelOpen(false);
     setNotification({ message: 'Flow restored!', type: 'success' });
-  };
+  }, [resetFlowState]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
+    console.log("DEBUG: Resetting canvas");
     const startNode = nodes.find(node => node.type === 'start');
     resetFlowState({ nodes: startNode ? [startNode] : [], edges: [] });
     setIsResetModalOpen(false);
     setNotification({ message: 'Canvas reset!', type: 'success' });
-  };
+  }, [nodes, resetFlowState]);
 
   const onNodeDataChange = useCallback((nodeId, newData) => {
-    setNodes(
-      nodes.map((node) => {
-        if (node.id === nodeId) {
-          return { ...node, data: { ...node.data, ...newData } };
-        }
-        return node;
-      })
+    console.log(`DEBUG: onNodeDataChange for node ${nodeId}`, newData);
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, ...newData } }
+          : node
+      )
     );
-  }, [nodes, setNodes]);
+  }, [setNodes]);
 
 
   const nodesWithDataHandlers = useMemo(() => {
