@@ -136,14 +136,6 @@ const AppComponent = () => {
     }
   }, [resetFlowState, setFlowName, setCurrentFlowId]);
 
-  useEffect(() => {
-    const root = document.getElementById('root');
-    if (isSimulatorOpen) {
-      root.classList.add('simulator-open');
-    } else {
-      root.classList.remove('simulator-open');
-    }
-  }, [isSimulatorOpen]);
 
   useEffect(() => {
     const fetchInitialFlow = async () => {
@@ -322,7 +314,7 @@ const AppComponent = () => {
           onRestore={handleRestore}
         />
         <Sidebar onReset={() => setIsResetModalOpen(true)} />
-        <main className="flex-1 bg-background-light dark:bg-background-dark p-6">
+        <main className={`flex-1 bg-background-light dark:bg-background-dark p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
           <div data-tour="canvas" className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col" style={{backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px'}}>
             <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
               <div className="header-controls flex items-center justify-between p-1.5 border-b border-border-light dark:border-border-dark flex-shrink-0">

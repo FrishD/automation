@@ -57,27 +57,19 @@ def speak(text):
 
 
 def listen_for_command(model):
-    """Waits for audio data from stdin, processes it, and returns the text."""
-    send_message({"type": "status_update", "status": "listening", "subtitle": "Say something..."})
+    """Listens for a command from the user and returns it as text."""
+    send_message({"type": "status_update", "status": "listening", "subtitle": "Waiting for your response..."})
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        r.pause_threshold = 1.5
+        r.adjust_for_ambient_noise(source, duration=1)
+        audio = r.listen(source)
 
     try:
-        header = sys.stdin.readline().strip()
-        if not header.startswith('--AUDIO--'):
-            raise ValueError(f"Invalid audio header received: {header}")
-
-        audio_length = int(header.split('--AUDIO--')[1])
-        audio_data = sys.stdin.buffer.read(audio_length)
-
-        if not audio_data:
-            send_message({"type": "error", "message": "No audio data received despite header."})
-            return ""
-
         send_message({"type": "status_update", "status": "recognizing", "subtitle": "Transcribing audio..."})
-
-        # Use a temporary file to save the audio for Whisper
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as fp:
-            fp.write(audio_data)
-            temp_audio_path = fp.name
+        temp_audio_path = "temp_audio.wav"
+        with open(temp_audio_path, "wb") as f:
+            f.write(audio.get_wav_data())
 
         result = model.transcribe(temp_audio_path, fp16=False)
         command = result["text"]
@@ -85,10 +77,8 @@ def listen_for_command(model):
         send_message({"type": "user_speech", "text": command})
         os.remove(temp_audio_path)
         return command.lower().strip()
-
     except Exception as e:
         send_message({"type": "error", "message": f"Recognition error: {e}"})
-        traceback.print_exc()
         return ""
 
 # --- Conversation Engine ---
@@ -180,23 +170,10 @@ class ConversationEngine:
 
 if __name__ == "__main__":
     try:
-        # Read the header line which contains the length of the JSON data
-        header = sys.stdin.readline().strip()
-        if not header:
-            raise ValueError("Did not receive data header.")
-
-        json_length = int(header)
-
-        # Read the exact number of bytes for the JSON data
-        flow_data_string = sys.stdin.buffer.read(json_length).decode('utf-8')
-        if not flow_data_string:
-            raise ValueError("No flow data received from stdin.")
-
+        flow_data_string = sys.stdin.read()
         flow = json.loads(flow_data_string)
-
     except Exception as e:
         send_message({"type": "error", "message": f"Error reading flow data from stdin: {e}"})
-        traceback.print_exc()
         exit(1)
 
     try:

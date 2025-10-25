@@ -9,22 +9,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-#root::before {
+.simulator-open .react-flow__pane {
+  pointer-events: none !important;
+  cursor: not-allowed;
+}
+
+.simulator-open .react-flow__viewport::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0);
-  pointer-events: none;
-  transition: background-color 0.3s ease-in-out;
-  z-index: 30; /* Lower than simulator, higher than canvas */
-}
-
-#root.simulator-open::before {
   background-color: rgba(0, 0, 0, 0.5);
+  z-index: 10;
   pointer-events: all;
+  cursor: not-allowed;
 }
 
 code {
