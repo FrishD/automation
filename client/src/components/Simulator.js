@@ -5,10 +5,8 @@ import Typewriter from './Typewriter';
 
 const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [audioData, setAudioData] = useState(new Uint8Array(0));
   const [subtitle, setSubtitle] = useState('');
   const [status, setStatus] = useState('Idle');
-  const [isPulsing, setIsPulsing] = useState(false);
   const ws = useRef(null);
 
   const playBloopSound = () => {
@@ -31,8 +29,6 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   useEffect(() => {
     if (isOpen) {
       playBloopSound();
-      setIsPulsing(true);
-      setTimeout(() => setIsPulsing(false), 500);
     }
     if (isOpen && currentFlowId) {
       const socket = new WebSocket('ws://localhost:5000');
@@ -44,17 +40,6 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       };
 
       socket.onmessage = (event) => {
-        if (event.data instanceof Blob) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const arrayBuffer = reader.result;
-            const uint8Array = new Uint8Array(arrayBuffer);
-            setAudioData(uint8Array);
-          };
-          reader.readAsArrayBuffer(event.data);
-          return;
-        }
-
         const message = JSON.parse(event.data);
 
         if (message.type === 'node_active') {
@@ -68,7 +53,6 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
           setSubtitle(message.text || '');
         } else if (message.type === 'speak_end') {
           setIsAnimating(false);
-          setAudioData(new Uint8Array(0));
           setStatus('Waiting for user input');
           setSubtitle('');
         }
@@ -103,7 +87,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         </button>
       </div>
       <div className="flex-grow flex flex-col items-center justify-center">
-        <SoundVisualization isAnimating={isAnimating} audioData={audioData} isPulsing={isPulsing} />
+        <SoundVisualization isAnimating={isAnimating} />
         <div className="mt-6 text-center h-24">
           <AnimatePresence mode="wait">
             <motion.p

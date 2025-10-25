@@ -1,87 +1,43 @@
 .visualization-container {
-  position: relative;
-  width: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   height: 150px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.circle {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background-color: #f0f4f8;
-  transition: background-color 0.3s ease, transform 0.3s ease;
-  z-index: 1;
-}
-
-.circle.animating {
-  transform: scale(1.05);
-  background-color: #e2e8f0;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-}
-
-.circle.pulsing {
-  animation: pulse 0.5s ease-out;
-}
-
-.dark .circle {
-  background-color: #1e293b;
-}
-
-.dark .circle.animating {
-  background-color: #334155;
-}
-
-.waves {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
-  height: 100%;
+}
+
+.sound-wave {
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 100px;
 }
 
-.wave {
-  position: absolute;
-  width: 4px;
-  border-radius: 2px;
-  background-color: #a7b4c4;
-  animation: wave-animation 1.5s ease-in-out infinite alternate;
-  animation-delay: calc(var(--i) * 0.05s);
-  transform-origin: bottom;
-  bottom: 50%;
-  transform: translateY(50%) rotate(calc(var(--i) * (360 / 15) * 1deg)) translateY(-60px);
+.sound-wave .bar {
+  width: 12px;
+  height: 10px;
+  margin: 0 4px;
+  background-color: #6366f1; /* indigo-500 */
+  border-radius: 4px;
+  transition: height 0.3s ease;
+}
+
+.sound-wave.animating .bar {
+  animation: wave-animation 1.2s ease-in-out infinite;
 }
 
 @keyframes wave-animation {
-  0% {
-    height: 10px;
-    background-color: #67e8f9;
-  }
-  50% {
-    height: 40px;
-    background-color: #818cf8;
-  }
-  100% {
-    height: 20px;
-    background-color: #f472b6;
-  }
+  0% { height: 10px; }
+  50% { height: 80px; }
+  100% { height: 10px; }
 }
+
+/* Add staggered animation delays */
+.sound-wave.animating .bar:nth-child(2) { animation-delay: 0.2s; }
+.sound-wave.animating .bar:nth-child(3) { animation-delay: 0.4s; }
+.sound-wave.animating .bar:nth-child(4) { animation-delay: 0.6s; }
+.sound-wave.animating .bar:nth-child(5) { animation-delay: 0.8s; }
+.sound-wave.animating .bar:nth-child(6) { animation-delay: 0.8s; }
+.sound-wave.animating .bar:nth-child(7) { animation-delay: 0.6s; }
+.sound-wave.animating .bar:nth-child(8) { animation-delay: 0.4s; }
+.sound-wave.animating .bar:nth-child(9) { animation-delay: 0.2s; }
