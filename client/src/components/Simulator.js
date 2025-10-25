@@ -42,9 +42,22 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
 
+        if (message.type === 'status_update') {
+          const newStatus = message.status;
+          if (newStatus === 'speaking') {
+            setStatus('Agent Speaking');
+            setIsAnimating(true);
+          } else if (newStatus === 'listening') {
+            setStatus('Listening...');
+            setIsAnimating(false);
+          } else {
+            setStatus(newStatus.charAt(0).toUpperCase() + newStatus.slice(1));
+            setIsAnimating(false);
+          }
+        }
+
         if (message.type === 'node_active') {
           onNodeHighlight(message.nodeId);
-          setStatus(`Executing: ${message.nodeType}`);
         }
 
         if (message.type === 'speak_start') {
@@ -70,6 +83,12 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
     }
   }, [isOpen, currentFlowId, onNodeHighlight]);
 
+  const getAnimationStatus = () => {
+    if (status === 'Agent Speaking') return 'speaking';
+    if (status === 'Listening...') return 'listening';
+    return 'idle';
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -87,7 +106,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         </button>
       </div>
       <div className="flex-grow flex flex-col items-center justify-center">
-        <SoundVisualization isAnimating={isAnimating} />
+        <SoundVisualization status={getAnimationStatus()} />
         <div className="mt-6 text-center h-24">
           <AnimatePresence mode="wait">
             <motion.p

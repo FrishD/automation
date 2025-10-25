@@ -21,8 +21,7 @@ def send_message(data):
 def speak(text):
     """Converts text to speech and plays it."""
     try:
-        send_message({"type": "status_update", "status": "speaking", "subtitle": text})
-        send_message({"type": "speak_start"})
+        send_message({"type": "speak_start", "text": text})
 
         # Detect language
         if any('\u0590' <= c <= '\u05FF' for c in text):
