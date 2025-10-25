@@ -33,15 +33,15 @@ const CircularWaveform = ({
 
       const waveformSamples = Array(barCount).fill(0).map((_, i) => {
         const seed = i * 1000;
-        const random = () => {
-          var x = Math.sin(seed++) * 10000;
+        const random = (s) => {
+          const x = Math.sin(s) * 10000;
           return x - Math.floor(x);
         };
         return (
           Math.max(
             0.1,
             Math.abs(Math.sin(frame / 20 + i / (barCount / (2 * Math.PI)))) +
-            random() * 0.3
+            random(seed) * 0.3
           ) * 0.5 + 0.25
         );
       });

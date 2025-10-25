@@ -28,26 +28,27 @@ const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
   console.log('Client connected for simulation');
+  let pythonProcess = null;
 
   ws.on('message', async (message) => {
-    try {
-      const { flowId } = JSON.parse(message);
-      const flow = await Flow.findById(flowId);
+    // If the message is a string, it's our initial JSON command
+    if (typeof message === 'string' || message instanceof String) {
+        try {
+            const data = JSON.parse(message);
+            if (data.type === 'start_simulation' && data.flowId) {
+                const flow = await Flow.findById(data.flowId);
+                if (!flow) {
+                    ws.send(JSON.stringify({ type: 'error', data: 'Flow not found' }));
+                    ws.close();
+                    return;
+                }
 
-      if (!flow) {
-        ws.send(JSON.stringify({ type: 'error', data: 'Flow not found' }));
-        ws.close();
-        return;
-      }
+                const flowData = flow.toObject();
+                pythonProcess = spawn('python3', ['../simulator/main.py']);
 
-      const flowData = flow.toObject();
-      const pythonProcess = spawn('python3', ['../simulator/main.py']);
-
-      pythonProcess.stdin.write(JSON.stringify(flowData));
-      pythonProcess.stdin.end();
-
-      let buffer = '';
-      pythonProcess.stdout.on('data', (data) => {
+                // Handle stdout from Python script
+                let buffer = '';
+                pythonProcess.stdout.on('data', (data) => {
         buffer += data.toString();
         const messages = buffer.split('\n');
         buffer = messages.pop(); // The last part might be incomplete, save it.
@@ -67,18 +68,31 @@ wss.on('connection', (ws) => {
         }
       });
 
-      pythonProcess.stderr.on('data', (data) => {
-        ws.send(JSON.stringify({ type: 'error', data: data.toString() }));
-      });
+                pythonProcess.stderr.on('data', (data) => {
+                    console.error(`Python stderr: ${data}`);
+                    ws.send(JSON.stringify({ type: 'error', data: data.toString() }));
+                });
 
-      pythonProcess.on('close', (code) => {
-        ws.send(JSON.stringify({ type: 'end', data: `Simulation finished with code ${code}` }));
-        ws.close();
-      });
+                pythonProcess.on('close', (code) => {
+                    console.log(`Python process exited with code ${code}`);
+                    ws.send(JSON.stringify({ type: 'end', data: `Simulation finished with code ${code}` }));
+                    ws.close();
+                });
 
-    } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', data: 'Failed to start simulation' }));
-      ws.close();
+                pythonProcess.stdin.write(JSON.stringify(flowData));
+                pythonProcess.stdin.end();
+            }
+        } catch (error) {
+            console.error('Failed to process incoming message:', error);
+            ws.send(JSON.stringify({ type: 'error', data: 'Invalid message format' }));
+        }
+    // If the message is binary data, it's our audio blob
+    } else if (message instanceof Buffer) {
+        if (pythonProcess && pythonProcess.stdin.writable) {
+            // Forward the audio data to the Python script's stdin
+            pythonProcess.stdin.write(message);
+            pythonProcess.stdin.end(); // Indicate that we are done sending audio
+        }
     }
   });
 

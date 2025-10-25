@@ -57,19 +57,23 @@ def speak(text):
 
 
 def listen_for_command(model):
-    """Listens for a command from the user and returns it as text."""
-    send_message({"type": "status_update", "status": "listening", "subtitle": "Waiting for your response..."})
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        r.pause_threshold = 1.5
-        r.adjust_for_ambient_noise(source, duration=1)
-        audio = r.listen(source)
+    """Waits for audio data from stdin, processes it, and returns the text."""
+    send_message({"type": "status_update", "status": "listening", "subtitle": "Say something..."})
 
     try:
+        # Read the raw audio data from stdin
+        audio_data = sys.stdin.buffer.read()
+
+        if not audio_data:
+            send_message({"type": "error", "message": "No audio data received."})
+            return ""
+
         send_message({"type": "status_update", "status": "recognizing", "subtitle": "Transcribing audio..."})
-        temp_audio_path = "temp_audio.wav"
-        with open(temp_audio_path, "wb") as f:
-            f.write(audio.get_wav_data())
+
+        # Use a temporary file to save the audio for Whisper
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as fp:
+            fp.write(audio_data)
+            temp_audio_path = fp.name
 
         result = model.transcribe(temp_audio_path, fp16=False)
         command = result["text"]
@@ -77,8 +81,10 @@ def listen_for_command(model):
         send_message({"type": "user_speech", "text": command})
         os.remove(temp_audio_path)
         return command.lower().strip()
+
     except Exception as e:
         send_message({"type": "error", "message": f"Recognition error: {e}"})
+        traceback.print_exc()
         return ""
 
 # --- Conversation Engine ---
@@ -169,11 +175,18 @@ class ConversationEngine:
         send_message({"type": "status_update", "status": "finished", "subtitle": "Flow complete."})
 
 if __name__ == "__main__":
-    try:
-        flow_data_string = sys.stdin.read()
-        flow = json.loads(flow_data_string)
-    except Exception as e:
-        send_message({"type": "error", "message": f"Error reading flow data from stdin: {e}"})
+    flow_data_string = ""
+    # Read stdin until we get a complete JSON object
+    for line in sys.stdin:
+        flow_data_string += line
+        try:
+            flow = json.loads(flow_data_string)
+            break # Exit loop once we have valid JSON
+        except json.JSONDecodeError:
+            continue # Continue reading if JSON is incomplete
+
+    if 'flow' not in locals():
+        send_message({"type": "error", "message": "Failed to decode flow JSON from stdin."})
         exit(1)
 
     try:

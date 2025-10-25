@@ -7,6 +7,9 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   const [status, setStatus] = useState('Idle');
   const [subtitle, setSubtitle] = useState('');
   const [isOpening, setIsOpening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorder = useRef(null);
+  const audioChunks = useRef([]);
   const ws = useRef(null);
   const audioContext = useRef(null);
 
@@ -41,6 +44,50 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       setIsOpening(false);
     }
   }, [isOpen]);
+
+  const startRecording = async () => {
+    if (isRecording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder.current = new MediaRecorder(stream);
+      audioChunks.current = [];
+
+      mediaRecorder.current.addEventListener("dataavailable", event => {
+        audioChunks.current.push(event.data);
+      });
+
+      mediaRecorder.current.addEventListener("stop", () => {
+        const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+          ws.current.send(audioBlob);
+        }
+        // Stop the media stream tracks to turn off the mic indicator
+        stream.getTracks().forEach(track => track.stop());
+      });
+
+      mediaRecorder.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      // Handle permission denied or other errors
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  useEffect(() => {
+    if (status === 'listening') {
+      startRecording();
+    } else {
+      stopRecording();
+    }
+  }, [status]);
+
 
   useEffect(() => {
     if (isOpen && currentFlowId) {
@@ -103,8 +150,11 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         <div className="absolute">
             <CircularWaveform isAnimating={isAnimating} />
         </div>
-        <div className="mt-6 text-center h-16">
-            <p className="text-lg font-medium text-on-surface-light dark:text-on-surface-dark capitalize">{status}</p>
+        <div className="absolute bottom-0 text-center h-16">
+            <div className="flex items-center justify-center gap-2">
+              <p className="text-lg font-medium text-on-surface-light dark:text-on-surface-dark capitalize">{status}</p>
+              {isRecording && <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />}
+            </div>
             {subtitle && <p className="text-md text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>}
         </div>
       </div>
