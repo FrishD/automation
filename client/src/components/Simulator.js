@@ -6,6 +6,7 @@ import Typewriter from './Typewriter';
 const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [subtitle, setSubtitle] = useState('');
+  const [subtitleDuration, setSubtitleDuration] = useState(0);
   const [status, setStatus] = useState('Idle');
   const ws = useRef(null);
 
@@ -64,10 +65,12 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
           setIsAnimating(true);
           setStatus('Agent Speaking');
           setSubtitle(message.text || '');
+          setSubtitleDuration(message.duration || 0);
         } else if (message.type === 'speak_end') {
           setIsAnimating(false);
           setStatus('Waiting for user input');
           setSubtitle('');
+          setSubtitleDuration(0);
         }
       };
 
@@ -121,7 +124,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
             </motion.p>
           </AnimatePresence>
           <div className="text-center mt-4 h-16">
-            {subtitle && <Typewriter text={subtitle} />}
+            {subtitle && <Typewriter text={subtitle} duration={subtitleDuration} />}
           </div>
         </div>
       </div>

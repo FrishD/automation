@@ -9,6 +9,7 @@ import asyncio
 import edge_tts
 import json
 import sys
+from mutagen.mp3 import MP3
 
 # --- Configuration ---
 API_BASE_URL = "http://localhost:5000/api/flows"
@@ -20,9 +21,9 @@ def send_message(data):
 
 def speak(text):
     """Converts text to speech and plays it."""
+    duration = 0
+    temp_file = ""
     try:
-        send_message({"type": "speak_start", "text": text})
-
         # Detect language
         if any('\u0590' <= c <= '\u05FF' for c in text):
             voice = "he-IL-HilaNeural"
@@ -36,22 +37,28 @@ def speak(text):
             communicate = edge_tts.Communicate(text, voice)
             await communicate.save(temp_file)
 
-        # This part must be run in an existing event loop or a new one
+        # Run async speech creation
         try:
             loop = asyncio.get_running_loop()
-        except RuntimeError:  # 'RuntimeError: There is no current event loop...'
+        except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-
         loop.run_until_complete(create_speech())
 
+        # Get audio duration
+        audio = MP3(temp_file)
+        duration = audio.info.length
+
+        # Send message with text and duration, then play sound
+        send_message({"type": "speak_start", "text": text, "duration": duration})
         from playsound3 import playsound
         playsound(temp_file)
-        os.remove(temp_file)
 
     except Exception as e:
         send_message({"type": "error", "message": f"TTS Error: {e}"})
     finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
         send_message({"type": "speak_end"})
 
 
