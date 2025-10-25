@@ -64,7 +64,7 @@ def speak(text):
 
 def listen_for_command(model, language=None):
     """Listens for a command from the user and returns it as text."""
-    send_message({"type": "status_update", "status": "listening", "subtitle": "Waiting for your response..."})
+    send_message({"type": "status_update", "status": "listening"})
     r = sr.Recognizer()
     with sr.Microphone() as source:
         r.pause_threshold = 1.5
@@ -122,14 +122,14 @@ class ConversationEngine:
         time.sleep(1)
 
         while self.current_node_id:
-            send_message({"type": "active_node", "nodeId": self.current_node_id})
-
             node = self.nodes.get(self.current_node_id)
             if not node:
                 send_message({"type": "error", "message": f"Node with ID {self.current_node_id} not found."})
                 break
 
             node_type = node.get('type')
+            send_message({"type": "active_node", "nodeId": self.current_node_id, "nodeType": node_type})
+
             node_data = node.get('data', {})
 
             if node_type == 'start':

@@ -4,34 +4,34 @@ import SoundVisualization from './SoundVisualization';
 import Typewriter from './Typewriter';
 
 const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
-  const [isAnimating, setIsAnimating] = useState(false);
   const [subtitle, setSubtitle] = useState('');
   const [subtitleDuration, setSubtitleDuration] = useState(0);
   const [status, setStatus] = useState('Idle');
   const ws = useRef(null);
 
   const playBloopSound = () => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+      console.error("Failed to play bloop sound:", error);
+    }
   };
 
   useEffect(() => {
-    if (isOpen) {
-      playBloopSound();
-    }
     if (isOpen && currentFlowId) {
+      playBloopSound();
+      setStatus('Initializing...');
+
       const socket = new WebSocket('ws://localhost:5000');
       ws.current = socket;
 
@@ -42,53 +42,60 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
 
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
+        console.log("Received message:", message);
 
-        if (message.type === 'status_update') {
-          const newStatus = message.status;
-          if (newStatus === 'speaking') {
+        switch (message.type) {
+          case 'status_update':
+            setStatus(message.status);
+            break;
+          case 'active_node':
+            onNodeHighlight(message.nodeId);
+            setStatus(`Running: ${message.nodeType || 'node'}`);
+            break;
+          case 'speak_start':
             setStatus('Agent Speaking');
-            setIsAnimating(true);
-          } else if (newStatus === 'listening') {
-            setStatus('Listening...');
-            setIsAnimating(false);
-          } else {
-            setStatus(newStatus.charAt(0).toUpperCase() + newStatus.slice(1));
-            setIsAnimating(false);
-          }
-        }
-
-        if (message.type === 'node_active') {
-          onNodeHighlight(message.nodeId);
-        }
-
-        if (message.type === 'speak_start') {
-          setIsAnimating(true);
-          setStatus('Agent Speaking');
-          setSubtitle(message.text || '');
-          setSubtitleDuration(message.duration || 0);
-        } else if (message.type === 'speak_end') {
-          setIsAnimating(false);
-          setStatus('Waiting for user input');
-          setSubtitle('');
-          setSubtitleDuration(0);
+            setSubtitle(message.text || '');
+            setSubtitleDuration(message.duration || 0);
+            break;
+          case 'speak_end':
+            setStatus('Waiting for user input');
+            setSubtitle('');
+            setSubtitleDuration(0);
+            break;
+          default:
+            break;
         }
       };
 
       socket.onclose = () => {
         console.log('WebSocket disconnected');
         onNodeHighlight(null);
-        setStatus('Finished');
+        if (status !== 'Finished') {
+            setStatus('Finished');
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setStatus('Error');
       };
 
       return () => {
-        socket.close();
+        if (ws.current) {
+            ws.current.close();
+        }
       };
+    } else {
+        setStatus('Idle');
+        setSubtitle('');
+        setSubtitleDuration(0);
+        onNodeHighlight(null);
     }
-  }, [isOpen, currentFlowId, onNodeHighlight]);
+  }, [isOpen, currentFlowId]);
 
   const getAnimationStatus = () => {
     if (status === 'Agent Speaking') return 'speaking';
-    if (status === 'Listening...') return 'listening';
+    if (status === 'listening') return 'listening';
     return 'idle';
   };
 
@@ -104,31 +111,31 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         >
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-on-surface-light dark:text-on-surface-dark">Simulator</h2>
-        <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
-          <span className="material-symbols-outlined text-lg">close</span>
-        </button>
-      </div>
-      <div className="flex-grow flex flex-col items-center justify-center">
-        <SoundVisualization status={getAnimationStatus()} />
-        <div className="mt-6 text-center h-24">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={status}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3 }}
-              className="text-lg font-medium text-on-surface-light dark:text-on-surface-dark"
-            >
-              {status}
-            </motion.p>
-          </AnimatePresence>
-          <div className="text-center mt-4 h-16">
-            {subtitle && <Typewriter text={subtitle} duration={subtitleDuration} />}
+            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
           </div>
-        </div>
-      </div>
-     </motion.div>
+          <div className="flex-grow flex flex-col items-center justify-center">
+            <SoundVisualization status={getAnimationStatus()} />
+            <div className="mt-6 text-center h-24">
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={status}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-lg font-medium text-on-surface-light dark:text-on-surface-dark capitalize"
+                >
+                  {status.replace(/_/g, ' ')}
+                </motion.p>
+              </AnimatePresence>
+              <div className="text-center mt-4 h-16">
+                {subtitle && <Typewriter text={subtitle} duration={subtitleDuration} />}
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
