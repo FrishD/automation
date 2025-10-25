@@ -278,6 +278,11 @@ const AppComponent = () => {
     }
   }, [currentFlowId, flowName, nodes, edges]);
 
+  const handleSimulate = async () => {
+    await saveFlow();
+    setIsSimulatorOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -334,7 +339,7 @@ const AppComponent = () => {
                   className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
                 />
                 <div className="flex items-center gap-1.5 mr-1">
-                  <button data-tour="simulate-button" onClick={() => setIsSimulatorOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <button data-tour="simulate-button" onClick={handleSimulate} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
                     <span className="material-symbols-outlined text-lg">play_circle</span>
                   </button>
                   <button data-tour="history-button" onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
