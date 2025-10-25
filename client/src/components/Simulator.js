@@ -1,15 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import SoundVisualization from './SoundVisualization';
+import Typewriter from './Typewriter';
 
 const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [logs, setLogs] = useState([]);
+  const [audioData, setAudioData] = useState(new Uint8Array(0));
+  const [subtitle, setSubtitle] = useState('');
   const [status, setStatus] = useState('Idle');
+  const [isPulsing, setIsPulsing] = useState(false);
   const ws = useRef(null);
 
+  const playBloopSound = () => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+  };
+
   useEffect(() => {
+    if (isOpen) {
+      playBloopSound();
+      setIsPulsing(true);
+      setTimeout(() => setIsPulsing(false), 500);
+    }
     if (isOpen && currentFlowId) {
-      setLogs([]);
       const socket = new WebSocket('ws://localhost:5000');
       ws.current = socket;
 
@@ -19,8 +44,18 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       };
 
       socket.onmessage = (event) => {
+        if (event.data instanceof Blob) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const arrayBuffer = reader.result;
+            const uint8Array = new Uint8Array(arrayBuffer);
+            setAudioData(uint8Array);
+          };
+          reader.readAsArrayBuffer(event.data);
+          return;
+        }
+
         const message = JSON.parse(event.data);
-        setLogs((prevLogs) => [...prevLogs, message]);
 
         if (message.type === 'node_active') {
           onNodeHighlight(message.nodeId);
@@ -30,9 +65,12 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         if (message.type === 'speak_start') {
           setIsAnimating(true);
           setStatus('Agent Speaking');
+          setSubtitle(message.text || '');
         } else if (message.type === 'speak_end') {
           setIsAnimating(false);
+          setAudioData(new Uint8Array(0));
           setStatus('Waiting for user input');
+          setSubtitle('');
         }
       };
 
@@ -48,30 +86,45 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
     }
   }, [isOpen, currentFlowId, onNodeHighlight]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="absolute top-0 left-0 h-full w-96 bg-white dark:bg-slate-800 border-r border-border-light dark:border-border-dark z-40 shadow-lg p-6 flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-on-surface-light dark:text-on-surface-dark">Simulator</h2>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ x: '-100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '-100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute top-0 left-0 h-full w-96 bg-white dark:bg-slate-800 border-r border-border-light dark:border-border-dark z-40 shadow-lg p-6 flex flex-col"
+        >
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-on-surface-light dark:text-on-surface-dark">Simulator</h2>
         <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
           <span className="material-symbols-outlined text-lg">close</span>
         </button>
       </div>
       <div className="flex-grow flex flex-col items-center justify-center">
-        <SoundVisualization isAnimating={isAnimating} />
-        <div className="mt-6 text-center">
-            <p className="text-lg font-medium text-on-surface-light dark:text-on-surface-dark">{status}</p>
+        <SoundVisualization isAnimating={isAnimating} audioData={audioData} isPulsing={isPulsing} />
+        <div className="mt-6 text-center h-24">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={status}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.3 }}
+              className="text-lg font-medium text-on-surface-light dark:text-on-surface-dark"
+            >
+              {status}
+            </motion.p>
+          </AnimatePresence>
+          <div className="text-center mt-4 h-16">
+            {subtitle && <Typewriter text={subtitle} />}
+          </div>
         </div>
       </div>
-      <div className="h-48 bg-slate-100 dark:bg-slate-900 rounded-lg p-4 overflow-y-auto">
-        {logs.map((log, index) => (
-          <p key={index} className="text-sm text-slate-500 dark:text-slate-400 font-mono">
-            {log.timestamp}: {log.message}
-          </p>
-        ))}
-      </div>
-    </div>
+     </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

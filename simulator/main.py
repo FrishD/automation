@@ -56,7 +56,7 @@ def speak(text):
         send_message({"type": "speak_end"})
 
 
-def listen_for_command(model):
+def listen_for_command(model, language=None):
     """Listens for a command from the user and returns it as text."""
     send_message({"type": "status_update", "status": "listening", "subtitle": "Waiting for your response..."})
     r = sr.Recognizer()
@@ -71,7 +71,10 @@ def listen_for_command(model):
         with open(temp_audio_path, "wb") as f:
             f.write(audio.get_wav_data())
 
-        result = model.transcribe(temp_audio_path, fp16=False)
+        transcribe_options = {"fp16": False}
+        if language:
+            transcribe_options["language"] = language
+        result = model.transcribe(temp_audio_path, **transcribe_options)
         command = result["text"]
 
         send_message({"type": "user_speech", "text": command})
@@ -133,7 +136,8 @@ class ConversationEngine:
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
-                user_input_from_listen = listen_for_command(self.whisper_model)
+                language = node_data.get('language', 'en')
+                user_input_from_listen = listen_for_command(self.whisper_model, language=language)
                 if "סיים שיחה" in user_input_from_listen:
                     speak("מסיים את השיחה. להתראות!")
                     break

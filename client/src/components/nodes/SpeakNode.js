@@ -5,7 +5,7 @@ const SpeakNode = ({ data }) => {
   return (
     <div
       className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 w-56 transition-all duration-300 ${
-        data.isHighlighted ? 'highlighted' : 'border-slate-200 dark:border-slate-700'
+        data.isHighlighted ? 'glow' : 'border-slate-200 dark:border-slate-700'
       }`}
     >
       <div className="flex items-center gap-3">

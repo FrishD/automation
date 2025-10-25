@@ -7,10 +7,18 @@ const ConditionSchema = new Schema({
 }, { _id: false });
 
 const NodeDataSchema = new Schema({
-  label: { type: String }, // Display name for the node in the UI
-  text: { type: String }, // For 'speak' nodes
-  conditions: [ConditionSchema], // For 'condition' nodes
-}, { _id: false });
+  label: { type: String },
+  text: { type: String },
+  conditions: [ConditionSchema],
+  language: { type: String }, // For 'listen' nodes
+  variableName: { type: String }, // For 'variable' nodes
+  value: { type: Schema.Types.Mixed }, // For 'variable' nodes
+  duration: { type: Number }, // For 'wait' nodes
+  audioUrl: { type: String }, // For 'play_audio' nodes
+  confirmationText: { type: String }, // For 'confirmation' nodes
+  summaryText: { type: String }, // For 'summary' nodes
+  condition: { type: String }, // For 'loop' nodes
+}, { _id: false, strict: false });
 
 
 const NodeSchema = new Schema({

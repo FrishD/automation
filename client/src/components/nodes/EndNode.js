@@ -5,7 +5,7 @@ const EndNode = ({ data }) => {
   return (
     <div
       className={`relative flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 transition-all duration-300 ${
-        data.isHighlighted ? 'highlighted' : 'border-slate-200 dark:border-slate-700'
+        data.isHighlighted ? 'glow' : 'border-slate-200 dark:border-slate-700'
       }`}
     >
       <span className="material-symbols-outlined text-primary text-2xl">stop</span>

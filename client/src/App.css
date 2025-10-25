@@ -2,3 +2,20 @@
   box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.8), 0 0 20px 10px rgba(196, 181, 253, 0.6);
   transition: box-shadow 0.3s ease-in-out;
 }
+
+@keyframes glow-animation {
+  0% {
+    box-shadow: 0 0 5px rgba(99, 102, 241, 0.5), 0 0 10px rgba(99, 102, 241, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(99, 102, 241, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(99, 102, 241, 0.5), 0 0 10px rgba(99, 102, 241, 0.5);
+  }
+}
+
+.glow {
+  animation: glow-animation 2s infinite ease-in-out;
+  border-color: rgba(99, 102, 241, 0.8) !important;
+}
