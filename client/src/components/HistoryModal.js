@@ -1,43 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
-const HistoryModal = ({ isOpen, history, onClose, onRestore }) => {
-  if (!isOpen) {
-    return null;
-  }
+const API_URL = 'http://localhost:5000/api/flows';
+
+const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    if (isOpen && currentFlowId) {
+      const fetchHistory = async () => {
+        try {
+          // The API returns a single flow object with a 'history' array
+          const response = await axios.get(`${API_URL}/${currentFlowId}`);
+          // We need to reverse the history to show the newest first
+          setHistory(response.data.history.slice().reverse());
+        } catch (error) {
+          console.error('Error fetching history:', error);
+        }
+      };
+      fetchHistory();
+    }
+  }, [isOpen, currentFlowId]);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-1/2 max-w-2xl flex flex-col p-4">
-        <div className="flex justify-between items-center border-b pb-2 mb-2">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Version History</h2>
-          <button onClick={onClose} className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
-            <span className="material-symbols-outlined text-lg">close</span>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-lg m-4 animate-fade-in-scale"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center pb-4 border-b border-border-light dark:border-border-dark">
+          <h2 className="text-xl font-bold text-on-surface-light dark:text-on-surface-dark">Version History</h2>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+            <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
-        <div className="flex-grow overflow-y-auto">
-          {history && history.length > 0 ? (
-            <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+        <div className="max-h-[60vh] overflow-y-auto mt-6 pr-2">
+          {history.length > 0 ? (
+            <div className="space-y-3">
               {history.map((version, index) => (
-                <li key={index} className="py-3 flex justify-between items-center">
+                <div key={`${version.timestamp}-${index}`} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
                   <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      Saved at: {new Date(version.savedAt).toLocaleString()}
+                    <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
+                      {new Date(version.timestamp).toLocaleString('en-US', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
                     </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {version.nodes.length} nodes, {version.edges.length} edges
                     </p>
                   </div>
                   <button
                     onClick={() => onRestore(version)}
-                    className="px-3 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    className="opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90"
                   >
                     Restore
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
-            <p className="text-center text-slate-500 dark:text-slate-400 py-8">No history found.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-8">No history found.</p>
           )}
         </div>
       </div>

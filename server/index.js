@@ -28,50 +28,78 @@ const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
   console.log('Client connected for simulation');
+  let pythonProcess = null;
 
   ws.on('message', async (message) => {
-    try {
-      const { flowId } = JSON.parse(message);
-      const flow = await Flow.findById(flowId);
-
-      if (!flow) {
-        ws.send(JSON.stringify({ type: 'error', data: 'Flow not found' }));
-        ws.close();
-        return;
-      }
-
-      const flowData = flow.toObject();
-      const pythonProcess = spawn('python3', ['../simulator/main.py']);
-
-      pythonProcess.stdin.write(JSON.stringify(flowData));
-      pythonProcess.stdin.end();
-
-      pythonProcess.stdout.on('data', (data) => {
-        const output = data.toString();
+    // If the message is a string, it's our initial JSON command
+    if (typeof message === 'string' || message instanceof String) {
         try {
-          // Check if the output is the JSON for active_node
-          const jsonData = JSON.parse(output);
-          if (jsonData.type === 'active_node') {
-            ws.send(JSON.stringify(jsonData));
+            const data = JSON.parse(message);
+            if (data.type === 'start_simulation' && data.flowId) {
+                const flow = await Flow.findById(data.flowId);
+                if (!flow) {
+                    ws.send(JSON.stringify({ type: 'error', data: 'Flow not found' }));
+                    ws.close();
+                    return;
+                }
+
+                const flowData = flow.toObject();
+                pythonProcess = spawn('python3', ['../simulator/main.py']);
+
+                // Handle stdout from Python script
+                let buffer = '';
+                pythonProcess.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const messages = buffer.split('\n');
+        buffer = messages.pop(); // The last part might be incomplete, save it.
+
+        for (const message of messages) {
+          if (message.trim() === '') continue;
+          try {
+            // The message from python is a self-contained JSON string.
+            // We don't need to parse it and re-stringify it, we can just check if it's valid
+            // and forward it. The client is expecting a string anyway.
+            JSON.parse(message); // This will throw if `message` is not valid JSON
+            ws.send(message); // Forward the original, valid JSON string
+          } catch (e) {
+            console.error('Could not parse simulator output line as JSON:', message);
+            // Avoid sending malformed data to the client
           }
-        } catch (e) {
-          // If it's not JSON, it's a regular log
-          ws.send(JSON.stringify({ type: 'log', data: output }));
         }
       });
 
-      pythonProcess.stderr.on('data', (data) => {
-        ws.send(JSON.stringify({ type: 'error', data: data.toString() }));
-      });
+                pythonProcess.stderr.on('data', (data) => {
+                    console.error(`Python stderr: ${data}`);
+                    ws.send(JSON.stringify({ type: 'error', data: data.toString() }));
+                });
 
-      pythonProcess.on('close', (code) => {
-        ws.send(JSON.stringify({ type: 'end', data: `Simulation finished with code ${code}` }));
-        ws.close();
-      });
+                pythonProcess.on('close', (code) => {
+                    console.log(`Python process exited with code ${code}`);
+                    ws.send(JSON.stringify({ type: 'end', data: `Simulation finished with code ${code}` }));
+                    ws.close();
+                });
 
-    } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', data: 'Failed to start simulation' }));
-      ws.close();
+                const flowDataString = JSON.stringify(flowData);
+                const dataLength = Buffer.byteLength(flowDataString, 'utf-8');
+
+                // Send a simple header: the byte length of the data followed by a newline
+                pythonProcess.stdin.write(`${dataLength}\\n`);
+                // Send the actual data
+                pythonProcess.stdin.write(flowDataString);
+            }
+        } catch (error) {
+            console.error('Failed to process incoming message:', error);
+            ws.send(JSON.stringify({ type: 'error', data: 'Invalid message format' }));
+        }
+    // If the message is binary data, it's our audio blob
+    } else if (message instanceof Buffer) {
+        if (pythonProcess && pythonProcess.stdin.writable) {
+            const audioLength = message.length;
+            // Send header for the audio data
+            pythonProcess.stdin.write(`--AUDIO--${audioLength}\\n`);
+            // Send the actual audio data
+            pythonProcess.stdin.write(message);
+        }
     }
   });
 
