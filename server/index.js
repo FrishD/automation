@@ -79,8 +79,8 @@ wss.on('connection', (ws) => {
                     ws.close();
                 });
 
-                pythonProcess.stdin.write(JSON.stringify(flowData));
-                pythonProcess.stdin.end();
+                // Send flow data as a single line, followed by a newline to signal end of initial data
+                pythonProcess.stdin.write(JSON.stringify(flowData) + '\\n');
             }
         } catch (error) {
             console.error('Failed to process incoming message:', error);
@@ -91,7 +91,7 @@ wss.on('connection', (ws) => {
         if (pythonProcess && pythonProcess.stdin.writable) {
             // Forward the audio data to the Python script's stdin
             pythonProcess.stdin.write(message);
-            pythonProcess.stdin.end(); // Indicate that we are done sending audio
+            // DO NOT end stdin here; the script might need to listen again.
         }
     }
   });

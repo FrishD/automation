@@ -37,26 +37,31 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
-        <div className="max-h-96 overflow-y-auto pr-2">
+        <div className="max-h-[60vh] overflow-y-auto pr-4 -mr-4">
           {history.length > 0 ? (
-            <ul className="space-y-4">
-              {history.map((version) => (
-                <li key={version.timestamp} className="p-4 rounded-lg bg-slate-100 dark:bg-slate-700 transition-colors hover:bg-slate-200 dark:hover:bg-slate-600">
-                  <p className="font-medium text-sm text-on-surface-light dark:text-on-surface-dark">
-                    {new Date(version.timestamp).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {version.nodes.length} nodes, {version.edges.length} edges
-                  </p>
+            <div className="space-y-3">
+              {history.map((version, index) => (
+                <div key={version.updatedAt} className="group flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-transparent hover:border-primary/50 dark:hover:bg-slate-700 transition-all">
+                  <div>
+                    <p className="font-semibold text-sm text-on-surface-light dark:text-on-surface-dark">
+                      {new Date(version.updatedAt).toLocaleString('en-US', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      {version.nodes.length} nodes, {version.edges.length} edges
+                    </p>
+                  </div>
                   <button
                     onClick={() => onRestore(version)}
-                    className="mt-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95"
+                    className="opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300 px-3 py-1 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90"
                   >
                     Restore
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-8">No history found.</p>
           )}

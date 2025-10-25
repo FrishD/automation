@@ -175,18 +175,18 @@ class ConversationEngine:
         send_message({"type": "status_update", "status": "finished", "subtitle": "Flow complete."})
 
 if __name__ == "__main__":
-    flow_data_string = ""
-    # Read stdin until we get a complete JSON object
-    for line in sys.stdin:
-        flow_data_string += line
-        try:
-            flow = json.loads(flow_data_string)
-            break # Exit loop once we have valid JSON
-        except json.JSONDecodeError:
-            continue # Continue reading if JSON is incomplete
+    try:
+        # The first line is always the flow data
+        flow_data_string = sys.stdin.readline()
+        if not flow_data_string:
+            raise ValueError("No flow data received from stdin.")
+        flow = json.loads(flow_data_string)
 
-    if 'flow' not in locals():
-        send_message({"type": "error", "message": "Failed to decode flow JSON from stdin."})
+        # The rest of stdin will be treated as audio input by listen_for_command
+
+    except Exception as e:
+        send_message({"type": "error", "message": f"Error reading flow data from stdin: {e}"})
+        traceback.print_exc()
         exit(1)
 
     try:
