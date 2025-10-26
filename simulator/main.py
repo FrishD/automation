@@ -181,31 +181,35 @@ class ConversationEngine:
                     speak("מסיים את השיחה. להתראות!")
                     break
 
-                # SIDE EFFECT: Check for connected variable nodes for entity extraction.
-                # This does not alter the control flow of the conversation.
-                variable_node_id = self._find_next_node_id(self.current_node_id, source_handle='variable')
-                if variable_node_id:
-                    variable_node = self.nodes.get(variable_node_id)
-                    if variable_node and variable_node.get('type') == 'variable':
-                        extraction_type = variable_node.get('data', {}).get('extractionType', 'full_text')
-                        variable_name = variable_node.get('data', {}).get('variableName')
+                # Find the next node in the sequence
+                next_node_id = self._find_next_node_id(self.current_node_id)
 
-                        if variable_name:
-                            extracted_value = extract_entity(user_input_from_listen, extraction_type, language)
-                            self.variables[variable_name] = extracted_value
-                            send_message({
-                                "type": "variable_update",
-                                "name": variable_name,
-                                "value": extracted_value,
-                                "status": "extracted" if extracted_value else "failed"
-                            })
-
-                # CONTROL FLOW: Always find the next node via the main 'condition' handle.
-                next_node_id = self._find_next_node_id(self.current_node_id, source_handle='condition')
                 if not next_node_id:
-                    # Fallback for non-conditional connections (if any)
-                    next_node_id = self._find_next_node_id(self.current_node_id)
-                self.current_node_id = next_node_id
+                    self.current_node_id = None
+                    continue
+
+                next_node = self.nodes.get(next_node_id)
+
+                # Check if the next node is a variable node for processing
+                if next_node and next_node.get('type') == 'variable':
+                    # It's a variable node, so perform extraction as a side-effect.
+                    extraction_type = next_node.get('data', {}).get('extractionType', 'full_text')
+                    variable_name = next_node.get('data', {}).get('variableName')
+                    if variable_name:
+                        extracted_value = extract_entity(user_input_from_listen, extraction_type, language)
+                        self.variables[variable_name] = extracted_value
+                        send_message({
+                            "type": "variable_update",
+                            "name": variable_name,
+                            "value": extracted_value,
+                            "status": "extracted" if extracted_value else "failed"
+                        })
+
+                    # Then, skip over it to the *next* node in the flow.
+                    self.current_node_id = self._find_next_node_id(next_node_id)
+                else:
+                    # It's a regular node, proceed as normal.
+                    self.current_node_id = next_node_id
 
             elif node_type == 'condition':
                 conditions = node_data.get('conditions', [])
