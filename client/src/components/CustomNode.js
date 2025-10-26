@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
+import cx from 'classnames';
 
 const CustomNode = ({ data }) => {
   const onLabelChange = (e) => {
@@ -9,8 +10,12 @@ const CustomNode = ({ data }) => {
     }
   };
 
+  const nodeClasses = cx('react-flow__node-default', {
+    'glow': data.isHighlighted,
+  });
+
   return (
-    <div className="react-flow__node-default">
+    <div className={nodeClasses}>
       <Handle type="target" position={Position.Top} />
       <div
         contentEditable

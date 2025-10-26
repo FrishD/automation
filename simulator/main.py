@@ -9,6 +9,7 @@ import asyncio
 import edge_tts
 import json
 import sys
+from mutagen.mp3 import MP3
 
 # --- Configuration ---
 API_BASE_URL = "http://localhost:5000/api/flows"
@@ -20,10 +21,9 @@ def send_message(data):
 
 def speak(text):
     """Converts text to speech and plays it."""
+    duration = 0
+    temp_file = ""
     try:
-        send_message({"type": "status_update", "status": "speaking", "subtitle": text})
-        send_message({"type": "speak_start"})
-
         # Detect language
         if any('\u0590' <= c <= '\u05FF' for c in text):
             voice = "he-IL-HilaNeural"
@@ -37,28 +37,34 @@ def speak(text):
             communicate = edge_tts.Communicate(text, voice)
             await communicate.save(temp_file)
 
-        # This part must be run in an existing event loop or a new one
+        # Run async speech creation
         try:
             loop = asyncio.get_running_loop()
-        except RuntimeError:  # 'RuntimeError: There is no current event loop...'
+        except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-
         loop.run_until_complete(create_speech())
 
+        # Get audio duration
+        audio = MP3(temp_file)
+        duration = audio.info.length
+
+        # Send message with text and duration, then play sound
+        send_message({"type": "speak_start", "text": text, "duration": duration})
         from playsound3 import playsound
         playsound(temp_file)
-        os.remove(temp_file)
 
     except Exception as e:
         send_message({"type": "error", "message": f"TTS Error: {e}"})
     finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
         send_message({"type": "speak_end"})
 
 
-def listen_for_command(model):
+def listen_for_command(model, language=None):
     """Listens for a command from the user and returns it as text."""
-    send_message({"type": "status_update", "status": "listening", "subtitle": "Waiting for your response..."})
+    send_message({"type": "status_update", "status": "listening"})
     r = sr.Recognizer()
     with sr.Microphone() as source:
         r.pause_threshold = 1.5
@@ -71,7 +77,10 @@ def listen_for_command(model):
         with open(temp_audio_path, "wb") as f:
             f.write(audio.get_wav_data())
 
-        result = model.transcribe(temp_audio_path, fp16=False)
+        transcribe_options = {"fp16": False}
+        if language:
+            transcribe_options["language"] = language
+        result = model.transcribe(temp_audio_path, **transcribe_options)
         command = result["text"]
 
         send_message({"type": "user_speech", "text": command})
@@ -113,14 +122,14 @@ class ConversationEngine:
         time.sleep(1)
 
         while self.current_node_id:
-            send_message({"type": "active_node", "nodeId": self.current_node_id})
-
             node = self.nodes.get(self.current_node_id)
             if not node:
                 send_message({"type": "error", "message": f"Node with ID {self.current_node_id} not found."})
                 break
 
             node_type = node.get('type')
+            send_message({"type": "active_node", "nodeId": self.current_node_id, "nodeType": node_type})
+
             node_data = node.get('data', {})
 
             if node_type == 'start':
@@ -129,11 +138,11 @@ class ConversationEngine:
             elif node_type == 'speak':
                 text_to_speak = node_data.get('text', 'No text configured.')
                 speak(text_to_speak)
-                time.sleep(0.5)
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
-                user_input_from_listen = listen_for_command(self.whisper_model)
+                language = node_data.get('language', 'en')
+                user_input_from_listen = listen_for_command(self.whisper_model, language=language)
                 if "סיים שיחה" in user_input_from_listen:
                     speak("מסיים את השיחה. להתראות!")
                     break

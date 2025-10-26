@@ -6,15 +6,27 @@ const ListenNode = ({ data }) => {
     <div
       data-tour="listen-node-example"
       className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 w-56 transition-all duration-300 ${
-        data.isHighlighted ? 'highlighted' : 'border-slate-200 dark:border-slate-700'
+        data.isHighlighted ? 'glow' : 'border-slate-200 dark:border-slate-700'
       }`}
     >
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-primary text-2xl">hearing</span>
         <span className="font-semibold text-sm">Listen</span>
       </div>
-      <div className="text-xs text-muted-light dark:text-muted-dark pt-3 border-t border-border-light dark:border-border-dark">
-        <p>Waits for the user to speak and captures their response.</p>
+      <div className="space-y-3 pt-3 border-t border-border-light dark:border-border-dark">
+        <p className="text-xs text-muted-light dark:text-muted-dark">Waits for the user to speak and captures their response.</p>
+        <div>
+          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="language">Language</label>
+          <select
+            id="language"
+            className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+            defaultValue={data.language || 'en'}
+            onChange={(e) => data.onChange({ ...data, language: e.target.value })}
+          >
+            <option value="en">English</option>
+            <option value="he">Hebrew</option>
+          </select>
+        </div>
       </div>
       <Handle
         type="target"

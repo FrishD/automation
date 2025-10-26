@@ -1,15 +1,24 @@
 import React from 'react';
 import './SoundVisualization.css';
+import cx from 'classnames';
 
-const SoundVisualization = ({ isAnimating }) => {
+const SoundVisualization = ({ status }) => {
+  const isSpeaking = status === 'speaking';
+  const isListening = status === 'listening';
+
+  const containerClasses = cx('visualization-container', {
+    'speaking': isSpeaking,
+    'listening': isListening,
+  });
+
   return (
-    <div className="visualization-container">
-      <div className={`circle ${isAnimating ? 'animating' : ''}`} />
-      {isAnimating && (
-        <div className="waves">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <div key={i} className="wave" style={{ '--i': i }} />
-          ))}
+    <div className={containerClasses}>
+      <div className="central-circle"></div>
+      {isSpeaking && (
+        <div className="ripple-container">
+          <div className="ripple-circle"></div>
+          <div className="ripple-circle"></div>
+          <div className="ripple-circle"></div>
         </div>
       )}
     </div>
