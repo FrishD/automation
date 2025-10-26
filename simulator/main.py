@@ -173,7 +173,17 @@ class ConversationEngine:
 
             elif node_type == 'speak':
                 text_to_speak = node_data.get('text', 'No text configured.')
-                speak(text_to_speak)
+
+                # Perform variable substitution
+                def replace_var(match):
+                    var_name = match.group(1).strip()
+                    # Return the value from self.variables, or the original placeholder if not found.
+                    # Ensure the returned value is a string.
+                    return str(self.variables.get(var_name, f"{{{var_name}}}"))
+
+                processed_text = regex.sub(r'\{([^}]+)\}', replace_var, text_to_speak)
+
+                speak(processed_text)
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
