@@ -266,11 +266,18 @@ const AppComponent = () => {
             return { ...node, data: restData };
         });
 
-        await axios.put(`${API_URL}/${currentFlowId}`, {
+        const flowData = {
             name: flowName,
             nodes: nodesToSave,
             edges: edges,
-        });
+        };
+
+        console.log('--- Saving Flow Data ---');
+        console.log('Nodes:', JSON.stringify(nodesToSave, null, 2));
+        console.log('Edges:', JSON.stringify(edges, null, 2));
+        console.log('------------------------');
+
+        await axios.put(`${API_URL}/${currentFlowId}`, flowData);
         setNotification({ message: 'Flow saved!', type: 'success' });
     } catch (error) {
         console.error("Error saving flow:", error);

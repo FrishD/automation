@@ -27,6 +27,43 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
     }
   };
 
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const startRecording = () => {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        mediaRecorder.ondataavailable = event => {
+          audioChunksRef.current.push(event.data);
+        };
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+          if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+            ws.current.send(audioBlob);
+          }
+          audioChunksRef.current = [];
+        };
+        mediaRecorder.start();
+        // Automatically stop recording after a few seconds of silence, a button, etc.
+        // For now, let's use a timeout for demonstration.
+        setTimeout(() => {
+            if (mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+            }
+        }, 5000); // Stop after 5 seconds
+      })
+      .catch(err => console.error("Error accessing microphone:", err));
+  };
+
+  useEffect(() => {
+    if (status === 'listening') {
+      startRecording();
+    }
+  }, [status]);
+
+
   useEffect(() => {
     if (isOpen && currentFlowId) {
       playBloopSound();
@@ -58,7 +95,6 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
             setSubtitleDuration(message.duration || 0);
             break;
           case 'speak_end':
-            setStatus('Waiting for user input');
             setSubtitle('');
             setSubtitleDuration(0);
             break;

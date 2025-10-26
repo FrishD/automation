@@ -28,62 +28,87 @@ const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
   console.log('Client connected for simulation');
+  let pythonProcess = null;
+
+  const cleanup = () => {
+    if (pythonProcess && !pythonProcess.killed) {
+      pythonProcess.kill();
+    }
+    pythonProcess = null;
+    console.log('Cleaned up python process.');
+  };
 
   ws.on('message', async (message) => {
-    try {
-      const { flowId } = JSON.parse(message);
-      const flow = await Flow.findById(flowId);
-
-      if (!flow) {
-        ws.send(JSON.stringify({ type: 'error', data: 'Flow not found' }));
-        ws.close();
-        return;
+    // Check if the message is binary audio data
+    if (message instanceof Buffer) {
+      if (pythonProcess && pythonProcess.stdin.writable) {
+        const lengthHeader = Buffer.from(message.length.toString() + '\n');
+        pythonProcess.stdin.write(lengthHeader);
+        pythonProcess.stdin.write(message);
       }
+      return;
+    }
 
-      const flowData = flow.toObject();
-      const pythonProcess = spawn('python3', ['../simulator/main.py']);
+    // Handle JSON messages
+    try {
+      const parsedMessage = JSON.parse(message);
 
-      pythonProcess.stdin.write(JSON.stringify(flowData));
-      pythonProcess.stdin.end();
+      if (parsedMessage.type === 'start_simulation') {
+        const { flowId } = parsedMessage;
+        const flow = await Flow.findById(flowId);
 
-      let buffer = '';
-      pythonProcess.stdout.on('data', (data) => {
-        buffer += data.toString();
-        const messages = buffer.split('\n');
-        buffer = messages.pop(); // The last part might be incomplete, save it.
-
-        for (const message of messages) {
-          if (message.trim() === '') continue;
-          try {
-            // The message from python is a self-contained JSON string.
-            // We don't need to parse it and re-stringify it, we can just check if it's valid
-            // and forward it. The client is expecting a string anyway.
-            JSON.parse(message); // This will throw if `message` is not valid JSON
-            ws.send(message); // Forward the original, valid JSON string
-          } catch (e) {
-            console.error('Could not parse simulator output line as JSON:', message);
-            // Avoid sending malformed data to the client
-          }
+        if (!flow) {
+          ws.send(JSON.stringify({ type: 'error', data: 'Flow not found' }));
+          return;
         }
-      });
 
-      pythonProcess.stderr.on('data', (data) => {
-        ws.send(JSON.stringify({ type: 'error', data: data.toString() }));
-      });
+        const flowData = flow.toObject();
 
-      pythonProcess.on('close', (code) => {
-        ws.send(JSON.stringify({ type: 'end', data: `Simulation finished with code ${code}` }));
-        ws.close();
-      });
+        pythonProcess = spawn('python3', ['../simulator/main.py']);
 
+        const flowString = JSON.stringify(flowData) + '\n';
+        pythonProcess.stdin.write(flowString);
+
+        pythonProcess.stdout.on('data', (data) => {
+          const dataStr = data.toString();
+          const messages = dataStr.split('\n').filter(m => m.trim() !== '');
+          messages.forEach(msg => {
+            try {
+              JSON.parse(msg); // Validate JSON
+              ws.send(msg);
+            } catch (e) {
+              console.error('Could not parse simulator output as JSON:', msg);
+            }
+          });
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+          ws.send(JSON.stringify({ type: 'error', data: data.toString() }));
+        });
+
+        pythonProcess.on('close', (code) => {
+          if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: 'end', data: `Simulation finished with code ${code}` }));
+          }
+          cleanup();
+        });
+      }
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', data: 'Failed to start simulation' }));
-      ws.close();
+      console.error("Error processing message:", error);
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({ type: 'error', data: 'Failed to process message' }));
+      }
     }
   });
 
   ws.on('close', () => {
     console.log('Client disconnected from simulation');
+    cleanup();
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    cleanup();
   });
 });
 
