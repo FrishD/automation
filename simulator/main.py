@@ -9,6 +9,8 @@ import asyncio
 import edge_tts
 import json
 import sys
+import dateparser
+import regex
 from mutagen.mp3 import MP3
 
 # --- Configuration ---
@@ -90,11 +92,42 @@ def listen_for_command(model, language=None):
         send_message({"type": "error", "message": f"Recognition error: {e}"})
         return ""
 
+def extract_entity(text, entity_type, language='en'):
+    """Extracts a specific entity from the given text."""
+    if not text:
+        return None
+
+    if entity_type == 'full_text':
+        return text
+
+    if entity_type == 'date':
+        # Use dateparser for robust date extraction
+        parsed_date = dateparser.search.search_dates(text, languages=[language])
+        return parsed_date[0][1].strftime('%Y-%m-%d') if parsed_date else None
+
+    if entity_type == 'time' or entity_type == 'hour':
+        # Regex for HH:MM format, optionally with AM/PM
+        match = regex.search(r'\b(\d{1,2}:\d{2})\s?(am|pm)?\b', text, regex.IGNORECASE)
+        return match.group(0) if match else None
+
+    if entity_type == 'email':
+        match = regex.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
+        return match.group(0) if match else None
+
+    if entity_type == 'phone_number':
+        # Regex for various phone number formats
+        match = regex.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
+        return match.group(0) if match else None
+
+    return None
+
+
 # --- Conversation Engine ---
 class ConversationEngine:
     def __init__(self, flow_data, whisper_model):
         self.nodes = {node['id']: node for node in flow_data['nodes']}
         self.edges = flow_data['edges']
+        self.variables = {}
         self.whisper_model = whisper_model
         self.current_node_id = self._get_node_by_type('start')
 
@@ -143,10 +176,38 @@ class ConversationEngine:
             elif node_type == 'listen':
                 language = node_data.get('language', 'en')
                 user_input_from_listen = listen_for_command(self.whisper_model, language=language)
+
                 if "סיים שיחה" in user_input_from_listen:
                     speak("מסיים את השיחה. להתראות!")
                     break
-                self.current_node_id = self._find_next_node_id(self.current_node_id)
+
+                # Check for connected variable nodes for entity extraction
+                variable_node_id = self._find_next_node_id(self.current_node_id, source_handle='variable')
+                if variable_node_id:
+                    variable_node = self.nodes.get(variable_node_id)
+                    if variable_node and variable_node.get('type') == 'variable':
+                        extraction_type = variable_node.get('data', {}).get('extractionType', 'full_text')
+                        variable_name = variable_node.get('data', {}).get('variableName')
+
+                        if variable_name:
+                            extracted_value = extract_entity(user_input_from_listen, extraction_type, language)
+                            self.variables[variable_name] = extracted_value
+                            send_message({
+                                "type": "variable_update",
+                                "name": variable_name,
+                                "value": extracted_value,
+                                "status": "extracted" if extracted_value else "failed"
+                            })
+                        # After extraction, move to the node connected to the variable node
+                        self.current_node_id = self._find_next_node_id(variable_node_id)
+                        continue # Skip the default next node finding for the listen node
+
+                # Default flow to condition node if no variable node is connected or after extraction
+                condition_node_id = self._find_next_node_id(self.current_node_id, source_handle='condition')
+                if condition_node_id:
+                    self.current_node_id = condition_node_id
+                else:
+                    self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'condition':
                 conditions = node_data.get('conditions', [])
