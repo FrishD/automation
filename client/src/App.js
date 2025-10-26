@@ -278,10 +278,10 @@ const AppComponent = () => {
     }
   }, [currentFlowId, flowName, nodes, edges]);
 
-  const handleSimulate = async () => {
+  const handleSimulate = useCallback(async () => {
     await saveFlow();
     setIsSimulatorOpen(true);
-  };
+  }, [saveFlow]);
 
   if (loading) {
     return (

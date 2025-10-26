@@ -138,7 +138,6 @@ class ConversationEngine:
             elif node_type == 'speak':
                 text_to_speak = node_data.get('text', 'No text configured.')
                 speak(text_to_speak)
-                time.sleep(0.5)
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
