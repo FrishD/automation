@@ -181,7 +181,8 @@ class ConversationEngine:
                     speak("מסיים את השיחה. להתראות!")
                     break
 
-                # Check for connected variable nodes for entity extraction
+                # SIDE EFFECT: Check for connected variable nodes for entity extraction.
+                # This does not alter the control flow of the conversation.
                 variable_node_id = self._find_next_node_id(self.current_node_id, source_handle='variable')
                 if variable_node_id:
                     variable_node = self.nodes.get(variable_node_id)
@@ -198,16 +199,13 @@ class ConversationEngine:
                                 "value": extracted_value,
                                 "status": "extracted" if extracted_value else "failed"
                             })
-                        # After extraction, move to the node connected to the variable node
-                        self.current_node_id = self._find_next_node_id(variable_node_id)
-                        continue # Skip the default next node finding for the listen node
 
-                # Default flow to condition node if no variable node is connected or after extraction
-                condition_node_id = self._find_next_node_id(self.current_node_id, source_handle='condition')
-                if condition_node_id:
-                    self.current_node_id = condition_node_id
-                else:
-                    self.current_node_id = self._find_next_node_id(self.current_node_id)
+                # CONTROL FLOW: Always find the next node via the main 'condition' handle.
+                next_node_id = self._find_next_node_id(self.current_node_id, source_handle='condition')
+                if not next_node_id:
+                    # Fallback for non-conditional connections (if any)
+                    next_node_id = self._find_next_node_id(self.current_node_id)
+                self.current_node_id = next_node_id
 
             elif node_type == 'condition':
                 conditions = node_data.get('conditions', [])
