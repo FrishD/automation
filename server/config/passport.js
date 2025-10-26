@@ -7,9 +7,9 @@ require('dotenv').config();
 passport.use(
   new GoogleStrategy(
     {
-      clientID: "608453700589-al1a5mj0gc4gq2og07chsmege85bdi5p.apps.googleusercontent.com",
-      clientSecret: "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",
-      callbackURL: 'http://localhost:5000/api/google-calendar/auth/google/callback', // This is the callback URL registered with Google
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_REDIRECT_URI, // This is the callback URL registered with Google
       proxy: true
     },
     async (accessToken, refreshToken, profile, done) => {
