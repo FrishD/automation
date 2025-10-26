@@ -263,7 +263,7 @@ const FlowEditor = () => {
                             >
                                 <Background />
                                 <Controls />
-                                {showMinimap && <MiniMap />}
+                                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />}
                             </ReactFlow>
                         </div>
                     </div>

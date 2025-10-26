@@ -4,33 +4,72 @@ const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const { google } = require('googleapis');
 const User = require('../models/User');
-const Flow = require('../models/Flow'); // Import the Flow model
+const Flow = require('../models/Flow');
 
-// ... (passport and auth routes remain the same)
+// --- Authentication Routes ---
+router.get('/auth/google', passport.authenticate('google', {
+    scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'],
+    accessType: 'offline',
+    prompt: 'consent'
+}));
 
-// Middleware to verify JWT and attach user to request
+router.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/', session: false }), (req, res) => {
+    const user = req.user;
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    res.redirect(`http://localhost:3000/auth/callback?token=${token}`);
+});
+
+// --- Middleware & Helpers ---
 const authenticateJWT = (req, res, next) => {
-    // ... (implementation remains the same)
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+        const token = authHeader.split(' ')[1];
+        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            if (err) return res.sendStatus(403);
+            try {
+                const user = await User.findById(decoded.id);
+                if (!user) return res.sendStatus(401);
+                req.user = user;
+                next();
+            } catch (dbError) {
+                res.status(500).send('Database error.');
+            }
+        });
+    } else {
+        res.sendStatus(401);
+    }
 };
 
 const getOAuth2Client = (user) => {
-    // ... (implementation remains the same)
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI
+    );
+    oauth2Client.setCredentials({
+        access_token: user.googleAccessToken,
+        refresh_token: user.googleRefreshToken
+    });
+    return oauth2Client;
 };
 
-// Endpoint to get the list of calendars
+// --- API Endpoints ---
 router.get('/calendars', authenticateJWT, async (req, res) => {
-    // ... (implementation remains the same)
+    try {
+        const oauth2Client = getOAuth2Client(req.user);
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+        const response = await calendar.calendarList.list();
+        res.json(response.data.items);
+    } catch (error) {
+        res.status(500).send('Failed to fetch calendar list.');
+    }
 });
 
-// Endpoint to find available time slots
 router.post('/availability', authenticateJWT, async (req, res) => {
     const { flowId, startDate } = req.body;
-
     try {
         const flow = await Flow.findById(flowId);
-        if (!flow || !flow.googleCalendar) {
-            return res.status(404).send('Flow or calendar settings not found.');
-        }
+        if (!flow || !flow.googleCalendar) return res.status(404).send('Flow or calendar settings not found.');
 
         const settings = flow.googleCalendar;
         const oauth2Client = getOAuth2Client(req.user);
@@ -38,9 +77,8 @@ router.post('/availability', authenticateJWT, async (req, res) => {
 
         const start = new Date(startDate);
         const end = new Date(start);
-        end.setDate(end.getDate() + 7); // Check for the next 7 days
+        end.setDate(end.getDate() + 7);
 
-        // Get busy times from Google Calendar
         const busyTimesResponse = await calendar.freebusy.query({
             requestBody: {
                 timeMin: start.toISOString(),
@@ -50,15 +88,12 @@ router.post('/availability', authenticateJWT, async (req, res) => {
         });
 
         const busySlots = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy;
-
-        // --- Availability Calculation Logic ---
         const availableSlots = [];
         const { startTime, endTime, meetingDuration, breakTime } = settings;
 
         for (let day = 0; day < 7; day++) {
             let currentSlotStart = new Date(start);
             currentSlotStart.setDate(currentSlotStart.getDate() + day);
-
             const [startHour, startMinute] = startTime.split(':').map(Number);
             currentSlotStart.setHours(startHour, startMinute, 0, 0);
 
@@ -68,41 +103,50 @@ router.post('/availability', authenticateJWT, async (req, res) => {
 
             while (currentSlotStart < dayEnd) {
                 const currentSlotEnd = new Date(currentSlotStart.getTime() + meetingDuration * 60000);
-
                 if (currentSlotEnd > dayEnd) break;
 
-                // Check for overlap with busy slots
                 const isOverlapping = busySlots.some(busy => {
                     const busyStart = new Date(busy.start);
                     const busyEnd = new Date(busy.end);
-                    // Check if currentSlot overlaps with busy slot
                     return (currentSlotStart < busyEnd && currentSlotEnd > busyStart);
                 });
 
                 if (!isOverlapping) {
-                    availableSlots.push({
-                        start: currentSlotStart.toISOString(),
-                        end: currentSlotEnd.toISOString(),
-                    });
+                    availableSlots.push({ start: currentSlotStart.toISOString(), end: currentSlotEnd.toISOString() });
                 }
-
                 currentSlotStart.setTime(currentSlotEnd.getTime() + (breakTime || 0) * 60000);
             }
         }
-
         res.json({ availableSlots });
-
     } catch (error) {
-        console.error('Error calculating availability:', error);
         res.status(500).send('Failed to calculate availability.');
     }
 });
 
-
-// Endpoint to create a new event
 router.post('/create-event', authenticateJWT, async (req, res) => {
-    // ... (implementation remains the same)
-});
+    const { flowId, startTime, endTime, summary, description, attendees } = req.body;
+    try {
+        const flow = await Flow.findById(flowId);
+        if (!flow || !flow.googleCalendar) return res.status(404).send('Flow or calendar settings not found.');
 
+        const oauth2Client = getOAuth2Client(req.user);
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+        const event = {
+            summary, description,
+            start: { dateTime: startTime, timeZone: 'America/Los_Angeles' }, // Should ideally get timezone from user settings
+            end: { dateTime: endTime, timeZone: 'America/Los_Angeles' },
+            attendees: attendees ? attendees.filter(e => e).map(email => ({ email })) : [],
+        };
+
+        const response = await calendar.events.insert({
+            calendarId: flow.googleCalendar.calendarId || 'primary',
+            resource: event,
+        });
+        res.status(201).json(response.data);
+    } catch (error) {
+        res.status(500).send('Failed to create event.');
+    }
+});
 
 module.exports = router;
