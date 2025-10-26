@@ -125,6 +125,7 @@ def extract_entity(text, entity_type, language='en'):
 # --- Conversation Engine ---
 class ConversationEngine:
     def __init__(self, flow_data, whisper_model):
+        self.flow_id = flow_data['_id']
         self.nodes = {node['id']: node for node in flow_data['nodes']}
         self.edges = flow_data['edges']
         self.variables = {}
@@ -246,6 +247,64 @@ class ConversationEngine:
                 end_text = node_data.get('text', 'Conversation ended.')
                 speak(end_text)
                 self.current_node_id = None
+
+            elif node_type == 'google_calendar':
+                speak("Let's schedule a meeting. When would you like to book it? For example, 'tomorrow at 3pm'.")
+                user_response = listen_for_command(self.whisper_model)
+
+                parsed_date = dateparser.parse(user_response)
+
+                if not parsed_date:
+                    speak("I'm sorry, I didn't understand that date. Please try again.")
+                    self.current_node_id = self.current_node_id # Stay on the same node
+                    continue
+
+                try:
+                    # Get availability from the server
+                    response = requests.post(
+                        "http://localhost:5000/api/google-calendar/availability",
+                        json={
+                            "flowId": self.flow_id,
+                            "startDate": parsed_date.isoformat()
+                        }
+                    )
+                    response.raise_for_status()
+                    availability = response.json()
+
+                    if not availability.get('availableSlots'):
+                        speak("I'm sorry, there are no available slots at that time. Would you like to try another date?")
+                        # Loop back to the beginning of this node's logic
+                        continue
+
+                    # For simplicity, let's take the first available slot
+                    slot_to_book = availability['availableSlots'][0]
+                    speak(f"I found an opening at {slot_to_book['start']}. Should I book it for you?")
+
+                    confirmation = listen_for_command(self.whisper_model)
+                    if "yes" in confirmation or "ok" in confirmation or "sure" in confirmation:
+                        # Create the event
+                        create_response = requests.post(
+                            "http://localhost:5000/api/google-calendar/create-event",
+                            json={
+                                "flowId": self.flow_id,
+                                "startTime": slot_to_book['start'],
+                                "endTime": slot_to_book['end'],
+                                "summary": "Meeting scheduled by Conversation Builder",
+                                "attendees": [self.variables.get('caller_email')] # Example of using a variable
+                            }
+                        )
+                        create_response.raise_for_status()
+                        speak("Great, your meeting is confirmed.")
+                        self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+                    else:
+                        speak("Ok, I won't schedule it. Is there another time you'd like to check?")
+                        continue # Loop back to the start of the node logic
+
+                except requests.exceptions.RequestException as e:
+                    speak("Sorry, I'm having trouble connecting to the calendar. Please try again later.")
+                    send_message({"type": "error", "message": str(e)})
+                    self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
+
 
             else:
                 send_message({"type": "error", "message": f"Unknown node type: {node_type}"})
