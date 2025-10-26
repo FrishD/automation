@@ -192,7 +192,16 @@ class ConversationEngine:
 
 if __name__ == "__main__":
     try:
-        flow_data_string = sys.stdin.read()
+        # Read the length of the flow data first
+        line = sys.stdin.readline()
+        if not line:
+            send_message({"type": "error", "message": "Did not receive flow data length from stdin."})
+            exit(1)
+
+        content_length = int(line.strip())
+
+        # Read the flow data from the buffer
+        flow_data_string = sys.stdin.buffer.read(content_length).decode('utf-8')
         send_message({"type": "debug", "message": "Received flow data", "data": flow_data_string})
         flow = json.loads(flow_data_string)
     except Exception as e:

@@ -117,6 +117,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       };
 
       return () => {
+        console.log("Cleanup: Closing WebSocket");
         if (ws.current) {
             ws.current.close();
         }

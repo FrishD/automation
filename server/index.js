@@ -66,8 +66,11 @@ wss.on('connection', (ws) => {
 
         pythonProcess = spawn('python3', ['../simulator/main.py']);
 
-        const flowString = JSON.stringify(flowData) + '\n';
+        const flowString = JSON.stringify(flowData);
+        const lengthHeader = Buffer.from(Buffer.byteLength(flowString, 'utf-8').toString() + '\n');
+        pythonProcess.stdin.write(lengthHeader);
         pythonProcess.stdin.write(flowString);
+
 
         pythonProcess.stdout.on('data', (data) => {
           const dataStr = data.toString();
