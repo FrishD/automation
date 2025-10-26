@@ -144,7 +144,10 @@ class ConversationEngine:
         for edge in self.edges:
             if edge['source'] == source_node_id:
                 if source_handle is None or edge.get('sourceHandle') == source_handle:
-                    return edge['target']
+                    target_id = edge.get('target')
+                    # Ensure the target node actually exists before returning it
+                    if target_id and target_id in self.nodes:
+                        return target_id
         return None
 
     def run(self):
