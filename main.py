@@ -4,6 +4,7 @@ from simulator.tts_hebrew import speak_hebrew
 from stt_hebrew import listen_hebrew
 from datetime import datetime
 
+
 def main_menu():
     while True:
         print("\n" + "="*50)

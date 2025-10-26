@@ -109,15 +109,29 @@ const AppComponent = () => {
 
 
   const nodesWithDataHandlers = useMemo(() => {
-    return nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        onChange: (newData) => onNodeDataChange(node.id, newData),
-        isHighlighted: node.id === highlightedNode,
+    return nodes.map(node => {
+      let isConnectedToListen = false;
+      if (node.type === 'variable') {
+        const incomingEdge = edges.find(edge => edge.target === node.id);
+        if (incomingEdge) {
+          const sourceNode = nodes.find(n => n.id === incomingEdge.source);
+          if (sourceNode && sourceNode.type === 'listen') {
+            isConnectedToListen = true;
+          }
+        }
       }
-    }));
-  }, [nodes, onNodeDataChange, highlightedNode]);
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          onChange: (newData) => onNodeDataChange(node.id, newData),
+          isHighlighted: node.id === highlightedNode,
+          isConnectedToListen: isConnectedToListen,
+        }
+      };
+    });
+  }, [nodes, edges, onNodeDataChange, highlightedNode]);
 
   const createNewFlow = useCallback(async () => {
     try {

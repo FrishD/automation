@@ -36,7 +36,14 @@ const ListenNode = ({ data }) => {
       <Handle
         type="source"
         position={Position.Right}
+        id="condition"
         className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="variable"
+        className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-slate-800"
       />
     </div>
   );

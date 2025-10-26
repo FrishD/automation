@@ -24,17 +24,36 @@ const VariableNode = ({ data, selected }) => {
             onChange={(e) => data.onChange({ ...data, variableName: e.target.value })}
           />
         </div>
-        <div>
-          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="variable-value">Value</label>
-          <textarea
-            className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
-            id="variable-value"
-            placeholder="Enter a value or expression"
-            rows="2"
-            defaultValue={data.value}
-            onChange={(e) => data.onChange({ ...data, value: e.target.value })}
-          ></textarea>
-        </div>
+        {data.isConnectedToListen ? (
+          <div>
+            <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="extraction-type">Extraction Type</label>
+            <select
+              id="extraction-type"
+              className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+              defaultValue={data.extractionType || 'full_text'}
+              onChange={(e) => data.onChange({ ...data, extractionType: e.target.value })}
+            >
+              <option value="full_text">Full Text</option>
+              <option value="date">Date</option>
+              <option value="time">Time</option>
+              <option value="hour">Hour</option>
+              <option value="email">Email</option>
+              <option value="phone_number">Phone Number</option>
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="variable-value">Value</label>
+            <textarea
+              className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+              id="variable-value"
+              placeholder="Enter a value or expression"
+              rows="2"
+              defaultValue={data.value}
+              onChange={(e) => data.onChange({ ...data, value: e.target.value })}
+            ></textarea>
+          </div>
+        )}
       </div>
       <Handle
         type="target"
