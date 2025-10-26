@@ -47,6 +47,20 @@ const FlowSchema = new Schema({
   },
   nodes: [NodeSchema],
   edges: [EdgeSchema],
+  googleCalendar: {
+    calendarId: { type: String },
+    availability: {
+      startTime: { type: String }, // e.g., "09:00"
+      endTime: { type: String },   // e.g., "17:00"
+    },
+    meetingDuration: { type: Number }, // in minutes
+    breakTime: { type: Number }, // in minutes
+    meetingLocations: [String],
+    meetingColor: { type: String },
+    maxMeetingsPerDay: { type: Number },
+    maxMeetingsPerWeek: { type: Number },
+    preferredTimes: [String], // e.g., ["10:00", "15:00"]
+  },
   createdAt: {
     type: Date,
     default: Date.now

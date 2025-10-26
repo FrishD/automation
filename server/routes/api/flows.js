@@ -52,6 +52,9 @@ router.put('/:id', async (req, res) => {
     flow.name = req.body.name;
     flow.nodes = req.body.nodes;
     flow.edges = req.body.edges;
+    if (req.body.googleCalendar) {
+        flow.googleCalendar = req.body.googleCalendar;
+    }
 
     const updatedFlow = await flow.save();
     res.json(updatedFlow);

@@ -2,8 +2,14 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const passport = require('passport');
+require('dotenv').config();
+
+// Passport Config
+require('./config/passport');
 
 const app = express();
+app.use(passport.initialize());
 const port = 5000;
 
 app.use(cors());
@@ -22,6 +28,8 @@ const Flow = require('./models/Flow');
 
 // Use Routes
 app.use('/api/flows', flowsRouter);
+const googleCalendarRoutes = require('./routes/googleCalendar');
+app.use('/api/google-calendar', googleCalendarRoutes);
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });

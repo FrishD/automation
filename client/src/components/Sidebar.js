@@ -36,6 +36,7 @@ const Sidebar = ({ onReset, className }) => {
       { type: 'wait', icon: 'timer', name: 'Wait' },
       { type: 'confirmation', icon: 'check_circle', name: 'Confirm' },
       { type: 'summary', icon: 'summarize', name: 'Summary' },
+      { type: 'google_calendar', icon: 'event', name: 'Google Calendar' },
     ],
   };
 
