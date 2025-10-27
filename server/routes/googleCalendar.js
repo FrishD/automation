@@ -25,13 +25,20 @@ const authenticateJWT = (req, res, next) => {
     if (authHeader) {
         const token = authHeader.split(' ')[1];
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-            if (err) return res.sendStatus(403);
+            if (err) {
+                console.error("JWT verification error:", err);
+                return res.sendStatus(403);
+            }
             try {
                 const user = await User.findById(decoded.id);
-                if (!user) return res.sendStatus(401);
+                if (!user) {
+                    console.error("Authenticated user not found in database for ID:", decoded.id);
+                    return res.sendStatus(401);
+                }
                 req.user = user;
                 next();
             } catch (dbError) {
+                console.error("Database error fetching user in JWT middleware:", dbError);
                 res.status(500).send('Database error.');
             }
         });
