@@ -89,6 +89,34 @@ const FlowEditor = () => {
     const reactFlowWrapper = useRef(null);
     const [ flowState, { set: setFlowState, reset: resetFlowState, undo: undoFlowState, redo: redoFlowState, canUndo, canRedo } ] = useUndo({ nodes: [], edges: [] });
     const { nodes, edges } = flowState.present;
+
+    // Create stable setters for nodes and edges using the functional update form of setState
+    const setNodes = useCallback(
+        (updater) => {
+            setFlowState({
+                ...flowState,
+                present: {
+                    ...flowState.present,
+                    nodes: typeof updater === 'function' ? updater(flowState.present.nodes) : updater,
+                }
+            });
+        },
+        [flowState, setFlowState]
+    );
+
+    const setEdges = useCallback(
+        (updater) => {
+            setFlowState({
+                ...flowState,
+                present: {
+                    ...flowState.present,
+                    edges: typeof updater === 'function' ? updater(flowState.present.edges) : updater,
+                }
+            });
+        },
+        [flowState, setFlowState]
+    );
+
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [flowName, setFlowName] = useState('Untitled Flow');
     const [currentFlowId, setCurrentFlowId] = useState(null);
@@ -101,18 +129,9 @@ const FlowEditor = () => {
     const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
-    const onNodesChange = useCallback(
-        (changes) => setFlowState(current => ({ ...current, nodes: applyNodeChanges(changes, current.nodes) })),
-        [setFlowState]
-    );
-    const onEdgesChange = useCallback(
-        (changes) => setFlowState(current => ({ ...current, edges: applyEdgeChanges(changes, current.edges) })),
-        [setFlowState]
-    );
-    const onConnect = useCallback(
-        (params) => setFlowState(current => ({ ...current, edges: addEdge(params, current.edges) })),
-        [setFlowState]
-    );
+    const onNodesChange = useCallback((changes) => setNodes(nds => applyNodeChanges(changes, nds)), [setNodes]);
+    const onEdgesChange = useCallback((changes) => setEdges(eds => applyEdgeChanges(changes, eds)), [setEdges]);
+    const onConnect = useCallback((params) => setEdges(eds => addEdge(params, eds)), [setEdges]);
 
     const createNewFlow = useCallback(async () => {
         try {
@@ -146,27 +165,20 @@ const FlowEditor = () => {
         }
       }, [resetFlowState, createNewFlow, currentFlowId]);
 
-    const onNodeDataChange = useCallback((nodeId, newData) => {
-        setFlowState(currentPresent => ({
-            ...currentPresent,
-            nodes: currentPresent.nodes.map(node =>
-                node.id === nodeId
-                    ? { ...node, data: { ...node.data, ...newData } }
-                    : node
-            )
-        }));
-    }, [setFlowState]);
+      const onNodeDataChange = useCallback((nodeId, newData) => {
+        setNodes(nds => nds.map((node) => node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node));
+      }, [setNodes]);
 
-    const nodesWithDataHandlers = useMemo(() => {
-        return nodes.map(node => ({
-            ...node,
-            data: {
+      const nodesWithDataHandlers = useMemo(() => {
+        return (nodes || []).map(node => ({
+          ...node,
+          data: {
             ...node.data,
             onChange: (newData) => onNodeDataChange(node.id, newData),
             isHighlighted: node.id === highlightedNode,
-            }
+          }
         }));
-    }, [nodes, onNodeDataChange, highlightedNode]);
+      }, [nodes, onNodeDataChange, highlightedNode]);
 
     const saveFlow = useCallback(async () => {
         if (!currentFlowId) return;
@@ -185,26 +197,26 @@ const FlowEditor = () => {
     const onDragOver = useCallback((event) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
-    }, []);
+      }, []);
 
-    const onDrop = useCallback(
+      const onDrop = useCallback(
         (event) => {
-            event.preventDefault();
-            const type = event.dataTransfer.getData('application/reactflow');
-            if (!type) return;
+          event.preventDefault();
+          const type = event.dataTransfer.getData('application/reactflow');
+          if (!type) return;
 
-            const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-            const newNode = {
+          const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+          const newNode = {
             id: getId(),
             type,
             position,
             data: { label: `${type} node` },
-            };
+          };
 
-            setFlowState(current => ({ ...current, nodes: current.nodes.concat(newNode) }));
+          setNodes(nds => nds.concat(newNode));
         },
-        [reactFlowInstance, setFlowState],
-    );
+        [reactFlowInstance, setNodes],
+      );
 
     const handleSimulate = useCallback(async () => {
         await saveFlow();
@@ -224,7 +236,7 @@ const FlowEditor = () => {
             <ReactFlowProvider>
                 <Sidebar onReset={() => setIsResetModalOpen(true)} />
                 <main className={`flex-1 bg-background-light dark:bg-background-dark p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
-                    <div data-tour="canvas" className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col">
+                    <div data-tour="canvas" className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow--hidden flex flex-col">
                         <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
                             <div className="header-controls flex items-center justify-between p-1.5 border-b">
                                 <div className="flex items-center gap-1">
