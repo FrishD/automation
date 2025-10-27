@@ -93,28 +93,28 @@ const FlowEditor = () => {
     // Create stable setters for nodes and edges using the functional update form of setState
     const setNodes = useCallback(
         (updater) => {
-            setFlowState({
-                ...flowState,
+            setFlowState(currentState => ({
+                ...currentState,
                 present: {
-                    ...flowState.present,
-                    nodes: typeof updater === 'function' ? updater(flowState.present.nodes) : updater,
+                    ...currentState.present,
+                    nodes: typeof updater === 'function' ? updater(currentState.present.nodes || []) : updater,
                 }
-            });
+            }));
         },
-        [flowState, setFlowState]
+        [setFlowState]
     );
 
     const setEdges = useCallback(
         (updater) => {
-            setFlowState({
-                ...flowState,
+            setFlowState(currentState => ({
+                ...currentState,
                 present: {
-                    ...flowState.present,
-                    edges: typeof updater === 'function' ? updater(flowState.present.edges) : updater,
+                    ...currentState.present,
+                    edges: typeof updater === 'function' ? updater(currentState.present.edges || []) : updater,
                 }
-            });
+            }));
         },
-        [flowState, setFlowState]
+        [setFlowState]
     );
 
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
