@@ -42,9 +42,9 @@ const authenticateJWT = (req, res, next) => {
 
 const getOAuth2Client = (user) => {
     const oauth2Client = new google.auth.OAuth2(
-        "608453700589-al1a5mj0gc4gq2og07chsmege85bdi5p.apps.googleusercontent.com",
-        "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",
-        "http://localhost:5000/api/google-calendar/auth/google/callback"
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_CALLBACK_URL
     );
     oauth2Client.setCredentials({
         access_token: user.googleAccessToken,
@@ -70,6 +70,7 @@ router.get('/calendars', authenticateJWT, async (req, res) => {
         const response = await calendar.calendarList.list();
         res.json(response.data.items);
     } catch (error) {
+        console.error("Error fetching Google Calendar list:", error);
         res.status(500).send('Failed to fetch calendar list.');
     }
 });
