@@ -50,6 +50,15 @@ const getOAuth2Client = (user) => {
         access_token: user.googleAccessToken,
         refresh_token: user.googleRefreshToken
     });
+
+    oauth2Client.on('tokens', async (tokens) => {
+        if (tokens.refresh_token) {
+            user.googleRefreshToken = tokens.refresh_token;
+        }
+        user.googleAccessToken = tokens.access_token;
+        await user.save();
+    });
+
     return oauth2Client;
 };
 
