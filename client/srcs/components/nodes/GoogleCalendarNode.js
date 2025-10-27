@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import axios from 'axios';
 
@@ -26,18 +26,6 @@ const GoogleCalendarNode = ({ data, id }) => {
   const [calendars, setCalendars] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  const updateSetting = useCallback((key, value) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    if (data.onChange) {
-      if (key === 'meetingLocations') {
-        data.onChange({ ...data, googleCalendar: { ...newSettings, meetingLocations: value.split(',').map(s => s.trim()).filter(Boolean) } });
-      } else {
-        data.onChange({ ...data, googleCalendar: newSettings });
-      }
-    }
-  }, [data, settings]);
 
   useEffect(() => {
     const checkAuthAndFetchCalendars = async () => {
@@ -70,8 +58,19 @@ const GoogleCalendarNode = ({ data, id }) => {
     };
 
     checkAuthAndFetchCalendars();
-  }, [settings.calendarId, updateSetting]);
+  }, [settings.calendarId]);
 
+  const updateSetting = (key, value) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    if (data.onChange) {
+      if (key === 'meetingLocations') {
+        data.onChange({ ...data, googleCalendar: { ...newSettings, meetingLocations: value.split(',').map(s => s.trim()).filter(Boolean) } });
+      } else {
+        data.onChange({ ...data, googleCalendar: newSettings });
+      }
+    }
+  };
 
   const handleAvailabilityChange = (ruleIndex, field, value) => {
     const newAvailability = [...settings.availability];
@@ -202,7 +201,7 @@ const GoogleCalendarNode = ({ data, id }) => {
               <input
                   type="text"
                   value={settings.meetingLocations}
-                  onChange={(e) => updateSetting('meetingLocations', e.target.value)}
+                  onChange={(e) => updateSetting('meetingLocations', e..target.value)}
                   className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
               />
             </div>

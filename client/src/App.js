@@ -95,7 +95,6 @@ const FlowEditor = () => {
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [flowName, setFlowName] = useState('Untitled Flow');
     const [currentFlowId, setCurrentFlowId] = useState(null);
-    const [menu, setMenu] = useState(null);
     const [notification, setNotification] = useState({ message: '', type: '' });
     const [showMinimap, setShowMinimap] = useState(true);
     const [loading, setLoading] = useState(true);
@@ -135,8 +134,10 @@ const FlowEditor = () => {
           } catch (error) { console.error("Error fetching flows:", error); }
           finally { setLoading(false); }
         };
-        fetchInitialFlow();
-      }, [resetFlowState, createNewFlow]);
+        if (!currentFlowId) {
+            fetchInitialFlow();
+        }
+      }, [resetFlowState, createNewFlow, currentFlowId]);
 
       const onNodeDataChange = useCallback((nodeId, newData) => {
         setNodes(nodes.map((node) => node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node));

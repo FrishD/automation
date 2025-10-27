@@ -91,7 +91,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
         setSubtitleDuration(0);
         onNodeHighlight(null);
     }
-  }, [isOpen, currentFlowId, onNodeHighlight]);
+  }, [isOpen, currentFlowId, onNodeHighlight, status]);
 
   const getAnimationStatus = () => {
     if (status === 'Agent Speaking') return 'speaking';
