@@ -89,9 +89,6 @@ const FlowEditor = () => {
     const reactFlowWrapper = useRef(null);
     const [ flowState, { set: setFlowState, reset: resetFlowState, undo: undoFlowState, redo: redoFlowState, canUndo, canRedo } ] = useUndo({ nodes: [], edges: [] });
     const { nodes, edges } = flowState.present;
-    const setNodes = useCallback((newNodes) => setFlowState({ ...flowState.present, nodes: newNodes }), [flowState.present, setFlowState]);
-    const setEdges = useCallback((newEdges) => setFlowState({ ...flowState.present, edges: newEdges }), [flowState.present, setFlowState]);
-
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [flowName, setFlowName] = useState('Untitled Flow');
     const [currentFlowId, setCurrentFlowId] = useState(null);
@@ -104,8 +101,18 @@ const FlowEditor = () => {
     const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
-    const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
-    const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+    const onNodesChange = useCallback(
+        (changes) => setFlowState(current => ({ ...current, nodes: applyNodeChanges(changes, current.nodes) })),
+        [setFlowState]
+    );
+    const onEdgesChange = useCallback(
+        (changes) => setFlowState(current => ({ ...current, edges: applyEdgeChanges(changes, current.edges) })),
+        [setFlowState]
+    );
+    const onConnect = useCallback(
+        (params) => setFlowState(current => ({ ...current, edges: addEdge(params, current.edges) })),
+        [setFlowState]
+    );
 
     const createNewFlow = useCallback(async () => {
         try {
@@ -139,20 +146,27 @@ const FlowEditor = () => {
         }
       }, [resetFlowState, createNewFlow, currentFlowId]);
 
-      const onNodeDataChange = useCallback((nodeId, newData) => {
-        setNodes(nodes.map((node) => node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node));
-      }, [nodes, setNodes]);
+    const onNodeDataChange = useCallback((nodeId, newData) => {
+        setFlowState(currentPresent => ({
+            ...currentPresent,
+            nodes: currentPresent.nodes.map(node =>
+                node.id === nodeId
+                    ? { ...node, data: { ...node.data, ...newData } }
+                    : node
+            )
+        }));
+    }, [setFlowState]);
 
-      const nodesWithDataHandlers = useMemo(() => {
+    const nodesWithDataHandlers = useMemo(() => {
         return nodes.map(node => ({
-          ...node,
-          data: {
+            ...node,
+            data: {
             ...node.data,
             onChange: (newData) => onNodeDataChange(node.id, newData),
             isHighlighted: node.id === highlightedNode,
-          }
+            }
         }));
-      }, [nodes, onNodeDataChange, highlightedNode]);
+    }, [nodes, onNodeDataChange, highlightedNode]);
 
     const saveFlow = useCallback(async () => {
         if (!currentFlowId) return;
@@ -168,31 +182,29 @@ const FlowEditor = () => {
         }
     }, [currentFlowId, flowName, nodes, edges]);
 
-    const onConnect = useCallback((params) => setEdges(addEdge(params, edges)), [edges, setEdges]);
-
     const onDragOver = useCallback((event) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
-      }, []);
+    }, []);
 
-      const onDrop = useCallback(
+    const onDrop = useCallback(
         (event) => {
-          event.preventDefault();
-          const type = event.dataTransfer.getData('application/reactflow');
-          if (!type) return;
+            event.preventDefault();
+            const type = event.dataTransfer.getData('application/reactflow');
+            if (!type) return;
 
-          const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-          const newNode = {
+            const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+            const newNode = {
             id: getId(),
             type,
             position,
             data: { label: `${type} node` },
-          };
+            };
 
-          setNodes(nodes.concat(newNode));
+            setFlowState(current => ({ ...current, nodes: current.nodes.concat(newNode) }));
         },
-        [reactFlowInstance, nodes, setNodes],
-      );
+        [reactFlowInstance, setFlowState],
+    );
 
     const handleSimulate = useCallback(async () => {
         await saveFlow();
