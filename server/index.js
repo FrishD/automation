@@ -1,5 +1,16 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, './.env') });
+
+// Ensure all required environment variables are present.
+const requiredEnvVars = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL', 'JWT_SECRET'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Error: Missing required environment variable '${envVar}'.`);
+    console.error('Please create a .env file in the server/ directory by copying .env.example and filling in the values.');
+    process.exit(1);
+  }
+}
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
