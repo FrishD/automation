@@ -1,9 +1,10 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, './.env') });
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const passport = require('passport');
-require('dotenv').config();
 
 // Passport Config
 require('./config/passport');
@@ -16,7 +17,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost/conversation-builder', { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect("mongodb://localhost/conversation-builder", { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB Connected...'))
   .catch(err => console.log(err));
 

@@ -39,18 +39,23 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
         </div>
         <div className="max-h-96 overflow-y-auto pr-2">
           {history.length > 0 ? (
-            <ul className="space-y-4">
+            <ul className="space-y-3">
               {history.map((version) => (
-                <li key={version.timestamp} className="p-4 rounded-lg bg-slate-100 dark:bg-slate-700 transition-colors hover:bg-slate-200 dark:hover:bg-slate-600">
-                  <p className="font-medium text-sm text-on-surface-light dark:text-on-surface-dark">
-                    {new Date(version.timestamp).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {version.nodes.length} nodes, {version.edges.length} edges
-                  </p>
+                <li
+                  key={version.timestamp}
+                  className="group flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
+                >
+                  <div>
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">
+                      {new Date(version.timestamp).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      {version.nodes.length} nodes, {version.edges.length} edges
+                    </p>
+                  </div>
                   <button
                     onClick={() => onRestore(version)}
-                    className="mt-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 active:scale-95"
                   >
                     Restore
                   </button>
@@ -58,7 +63,11 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-8">No history found.</p>
+            <div className="text-center py-10">
+              <span className="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-500 mb-2">history</span>
+              <p className="font-medium text-slate-600 dark:text-slate-400">No Version History</p>
+              <p className="text-sm text-slate-500 dark:text-slate-500">Changes will be saved here automatically.</p>
+            </div>
           )}
         </div>
       </div>
