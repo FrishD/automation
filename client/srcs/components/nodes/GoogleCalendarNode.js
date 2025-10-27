@@ -58,9 +58,9 @@ const GoogleCalendarNode = ({ data, id }) => {
     };
 
     checkAuthAndFetchCalendars();
-  }, [settings.calendarId, updateSetting]);
+  }, [settings.calendarId]);
 
-  const updateSetting = useCallback((key, value) => {
+  const updateSetting = (key, value) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     if (data.onChange) {
@@ -201,7 +201,7 @@ const GoogleCalendarNode = ({ data, id }) => {
               <input
                   type="text"
                   value={settings.meetingLocations}
-                  onChange={(e) => updateSetting('meetingLocations', e.target.value)}
+                  onChange={(e) => updateSetting('meetingLocations', e..target.value)}
                   className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
               />
             </div>
