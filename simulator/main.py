@@ -189,6 +189,7 @@ class ConversationEngine:
 
             elif node_type == 'listen':
                 language = node_data.get('language', 'en')
+                self.variables['language'] = language
                 user_input_from_listen = listen_for_command(self.whisper_model, language=language)
 
                 if "סיים שיחה" in user_input_from_listen:
@@ -249,10 +250,11 @@ class ConversationEngine:
                 self.current_node_id = None
 
             elif node_type == 'google_calendar':
+                language_code = self.variables.get('language', 'en')
                 speak("Let's schedule a meeting. When would you like to book it? For example, 'tomorrow at 3pm'.")
-                user_response = listen_for_command(self.whisper_model)
+                user_response = listen_for_command(self.whisper_model, language=language_code)
 
-                parsed_date = dateparser.parse(user_response)
+                parsed_date = dateparser.parse(user_response, languages=[language_code])
 
                 if not parsed_date:
                     speak("I'm sorry, I didn't understand that date. Please try again.")
