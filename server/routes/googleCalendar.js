@@ -25,20 +25,13 @@ const authenticateJWT = (req, res, next) => {
     if (authHeader) {
         const token = authHeader.split(' ')[1];
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-            if (err) {
-                console.error("JWT verification error:", err);
-                return res.sendStatus(403);
-            }
+            if (err) return res.sendStatus(403);
             try {
                 const user = await User.findById(decoded.id);
-                if (!user) {
-                    console.error("Authenticated user not found in database for ID:", decoded.id);
-                    return res.sendStatus(401);
-                }
+                if (!user) return res.sendStatus(401);
                 req.user = user;
                 next();
             } catch (dbError) {
-                console.error("Database error fetching user in JWT middleware:", dbError);
                 res.status(500).send('Database error.');
             }
         });
@@ -49,23 +42,14 @@ const authenticateJWT = (req, res, next) => {
 
 const getOAuth2Client = (user) => {
     const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_CALLBACK_URL
+        "608453700589-al1a5mj0gc4gq2og07chsmege85bdi5p.apps.googleusercontent.com",
+        "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",
+        "http://localhost:5000/api/google-calendar/auth/google/callback"
     );
     oauth2Client.setCredentials({
         access_token: user.googleAccessToken,
         refresh_token: user.googleRefreshToken
     });
-
-    oauth2Client.on('tokens', async (tokens) => {
-        if (tokens.refresh_token) {
-            user.googleRefreshToken = tokens.refresh_token;
-        }
-        user.googleAccessToken = tokens.access_token;
-        await user.save();
-    });
-
     return oauth2Client;
 };
 
@@ -77,7 +61,6 @@ router.get('/calendars', authenticateJWT, async (req, res) => {
         const response = await calendar.calendarList.list();
         res.json(response.data.items);
     } catch (error) {
-        console.error("Error fetching Google Calendar list:", error);
         res.status(500).send('Failed to fetch calendar list.');
     }
 });

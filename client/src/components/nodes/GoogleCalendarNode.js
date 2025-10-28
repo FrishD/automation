@@ -115,7 +115,7 @@ const GoogleCalendarNode = ({ data, id }) => {
         <span className="material-symbols-outlined text-primary">calendar_month</span>
         <h3 className="font-bold text-lg">Google Calendar</h3>
       </div>
-      <div className="p-4 space-y-4 text-sm max-h-[28rem] overflow-y-auto">
+      <div className="p-4 space-y-4 text-sm overflow-y-auto">
         {isLoading ? (
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
