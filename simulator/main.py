@@ -254,6 +254,7 @@ class ConversationEngine:
                 speak("Let's schedule a meeting. When would you like to book it? For example, 'tomorrow at 3pm'.")
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
+                send_message({"type": "debug", "message": f"Trying to parse date from user response: '{user_response}'"})
                 parsed_date = dateparser.parse(user_response, languages=[language_code])
 
                 if not parsed_date:
