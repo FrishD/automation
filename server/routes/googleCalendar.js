@@ -89,7 +89,11 @@ router.post('/availability', authenticateJWT, async (req, res) => {
 
         const busySlots = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy;
         const availableSlots = [];
-        const { startTime, endTime, meetingDuration, breakTime } = settings;
+        const { startTime, endTime, meetingDuration, breakTime } = settings.availability || {};
+
+        if (!startTime || !endTime || !meetingDuration) {
+            return res.status(400).send('Missing required calendar availability settings (startTime, endTime, meetingDuration).');
+        }
 
         for (let day = 0; day < 7; day++) {
             let currentSlotStart = new Date(start);
