@@ -274,6 +274,7 @@ class ConversationEngine:
                         "http://localhost:5000/api/google-calendar/availability",
                         json={
                             "flowId": self.flow_id,
+                            "nodeId": self.current_node_id,
                             "startDate": parsed_date.isoformat()
                         },
                         headers=headers
