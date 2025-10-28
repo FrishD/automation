@@ -124,13 +124,14 @@ def extract_entity(text, entity_type, language='en'):
 
 # --- Conversation Engine ---
 class ConversationEngine:
-    def __init__(self, flow_data, whisper_model):
+    def __init__(self, flow_data, whisper_model, token=None):
         self.flow_id = flow_data['_id']
         self.nodes = {node['id']: node for node in flow_data['nodes']}
         self.edges = flow_data['edges']
         self.variables = {}
         self.whisper_model = whisper_model
         self.current_node_id = self._get_node_by_type('start')
+        self.jwt_token = token
 
         if not self.current_node_id:
             raise ValueError("Flow must have one 'start' node.")
@@ -250,8 +251,9 @@ class ConversationEngine:
                 self.current_node_id = None
 
             elif node_type == 'google_calendar':
-                language_code = self.variables.get('language', 'en')
-                speak("Let's schedule a meeting. When would you like to book it? For example, 'tomorrow at 3pm'.")
+                language_code = node_data.get('language', self.variables.get('language', 'en'))
+                prompt_text = "מתי תרצה לקבוע את הפגישה? למשל, 'מחר בשלוש'." if language_code == 'he' else "When would you like to book the meeting? For example, 'tomorrow at 3pm'."
+                speak(prompt_text)
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
                 send_message({"type": "debug", "message": f"Trying to parse date from user response: '{user_response}'"})
@@ -264,12 +266,17 @@ class ConversationEngine:
 
                 try:
                     # Get availability from the server
+                    headers = {}
+                    if self.jwt_token:
+                        headers['Authorization'] = f'Bearer {self.jwt_token}'
+
                     response = requests.post(
                         "http://localhost:5000/api/google-calendar/availability",
                         json={
                             "flowId": self.flow_id,
                             "startDate": parsed_date.isoformat()
-                        }
+                        },
+                        headers=headers
                     )
                     response.raise_for_status()
                     availability = response.json()
@@ -286,6 +293,10 @@ class ConversationEngine:
                     confirmation = listen_for_command(self.whisper_model)
                     if "yes" in confirmation or "ok" in confirmation or "sure" in confirmation:
                         # Create the event
+                        headers = {}
+                        if self.jwt_token:
+                            headers['Authorization'] = f'Bearer {self.jwt_token}'
+
                         create_response = requests.post(
                             "http://localhost:5000/api/google-calendar/create-event",
                             json={
@@ -294,7 +305,8 @@ class ConversationEngine:
                                 "endTime": slot_to_book['end'],
                                 "summary": "Meeting scheduled by Conversation Builder",
                                 "attendees": [self.variables.get('caller_email')] # Example of using a variable
-                            }
+                            },
+                            headers=headers
                         )
                         create_response.raise_for_status()
                         speak("Great, your meeting is confirmed.")
@@ -317,17 +329,19 @@ class ConversationEngine:
 
 if __name__ == "__main__":
     try:
-        flow_data_string = sys.stdin.read()
-        flow = json.loads(flow_data_string)
+        initial_message_string = sys.stdin.read()
+        initial_message = json.loads(initial_message_string)
+        flow = initial_message['flow']
+        token = initial_message.get('token')
     except Exception as e:
-        send_message({"type": "error", "message": f"Error reading flow data from stdin: {e}"})
+        send_message({"type": "error", "message": f"Error reading initial message from stdin: {e}"})
         exit(1)
 
     try:
         send_message({"type": "status_update", "status": "loading", "subtitle": "Loading speech model..."})
         whisper_model = whisper.load_model("base")
 
-        engine = ConversationEngine(flow, whisper_model)
+        engine = ConversationEngine(flow, whisper_model, token=token)
         engine.run()
 
     except Exception as e:

@@ -133,6 +133,18 @@ const GoogleCalendarNode = ({ data, id }) => {
           </div>
         ) : (
           <>
+            {/* Language Select */}
+            <div>
+              <label className="block font-medium mb-1.5">Language</label>
+              <select
+                value={settings.language || 'en'}
+                onChange={(e) => updateSetting('language', e.target.value)}
+                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
+              >
+                <option value="en">English</option>
+                <option value="he">עברית</option>
+              </select>
+            </div>
             {/* Calendar Select */}
             <div>
               <label className="block font-medium mb-1.5">Calendar</label>

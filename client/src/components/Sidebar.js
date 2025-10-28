@@ -10,6 +10,7 @@ const Block = ({ type, icon, name }) => (
         className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-background-light dark:bg-background-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 cursor-pointer transition-all"
         onDragStart={(event) => onDragStart(event, type)}
         draggable
+        data-testid={`dnd-node-${type}`}
     >
         <span className="material-symbols-outlined text-primary text-2xl">{icon}</span>
         <span className="font-medium text-xs text-center">{name}</span>

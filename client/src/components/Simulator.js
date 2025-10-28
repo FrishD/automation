@@ -8,6 +8,11 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
   const [subtitleDuration, setSubtitleDuration] = useState(0);
   const [status, setStatus] = useState('Idle');
   const ws = useRef(null);
+  const statusRef = useRef(status);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const playBloopSound = () => {
     try {
@@ -37,7 +42,8 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
 
       socket.onopen = () => {
         console.log('WebSocket connected');
-        socket.send(JSON.stringify({ type: 'start_simulation', flowId: currentFlowId }));
+        const token = localStorage.getItem('jwtToken');
+        socket.send(JSON.stringify({ type: 'start_simulation', flowId: currentFlowId, token: token }));
       };
 
       socket.onmessage = (event) => {
@@ -70,7 +76,7 @@ const Simulator = ({ isOpen, onClose, currentFlowId, onNodeHighlight }) => {
       socket.onclose = () => {
         console.log('WebSocket disconnected');
         onNodeHighlight(null);
-        if (status !== 'Finished') {
+        if (statusRef.current !== 'Finished') {
             setStatus('Finished');
         }
       };
