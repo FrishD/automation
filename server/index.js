@@ -40,7 +40,9 @@ wss.on('connection', (ws) => {
 
   ws.on('message', async (message) => {
     try {
-      const { flowId } = JSON.parse(message);
+      const initialMessage = JSON.parse(message);
+      const { flowId, token } = initialMessage;
+
       const flow = await Flow.findById(flowId);
 
       if (!flow) {
@@ -52,7 +54,13 @@ wss.on('connection', (ws) => {
       const flowData = flow.toObject();
       const pythonProcess = spawn('python3', ['../simulator/main.py']);
 
-      pythonProcess.stdin.write(JSON.stringify(flowData));
+      // Pass both flow and token to the Python script
+      const dataForPython = {
+        flow: flowData,
+        token: token,
+      };
+
+      pythonProcess.stdin.write(JSON.stringify(dataForPython));
       pythonProcess.stdin.end();
 
       let buffer = '';
