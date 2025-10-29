@@ -40,14 +40,14 @@ const HistoryModal = ({ isOpen, onClose, currentFlowId, onRestore }) => {
         <div className="max-h-96 overflow-y-auto pr-2">
           {history.length > 0 ? (
             <ul className="space-y-3">
-              {history.map((version) => (
+              {history.map((version, index) => (
                 <li
-                  key={version.timestamp}
+                  key={`${version.savedAt}-${index}`}
                   className="group flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700"
                 >
                   <div>
                     <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-                      {new Date(version.timestamp).toLocaleString()}
+                      {new Date(version.savedAt).toLocaleString()}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {version.nodes.length} nodes, {version.edges.length} edges
