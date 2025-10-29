@@ -84,10 +84,16 @@ router.post('/availability', authenticateJWT, async (req, res) => {
         const end = new Date(start);
         end.setDate(end.getDate() + 7);
 
+        // Get the calendar's timezone
+        const calendarInfo = await calendar.calendars.get({ calendarId: settings.calendarId || 'primary' });
+        const timeZone = calendarInfo.data.timeZone;
+
+
         const busyTimesResponse = await calendar.freebusy.query({
             requestBody: {
                 timeMin: start.toISOString(),
                 timeMax: end.toISOString(),
+                timeZone: timeZone,
                 items: [{ id: settings.calendarId || 'primary' }],
             },
         });
@@ -220,11 +226,14 @@ router.post('/create-event', authenticateJWT, async (req, res) => {
         const oauth2Client = getOAuth2Client(req.user);
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
+        const calendarInfo = await calendar.calendars.get({ calendarId: settings.calendarId || 'primary' });
+        const timeZone = calendarInfo.data.timeZone;
+
         const event = {
             summary: summary || settings.meetingSummary || 'Meeting Scheduled by Bot',
             description,
-            start: { dateTime: startTime, timeZone: 'America/Los_Angeles' }, // Should be dynamic
-            end: { dateTime: endTime, timeZone: 'America/Los_Angeles' },   // Should be dynamic
+            start: { dateTime: startTime, timeZone: timeZone },
+            end: { dateTime: endTime, timeZone: timeZone },
             attendees: attendees ? attendees.filter(e => e).map(email => ({ email })) : [],
         };
 
