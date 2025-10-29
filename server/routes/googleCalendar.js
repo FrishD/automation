@@ -92,8 +92,8 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             },
         });
 
-        const busySlots = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy;
-        const availableSlots = [];
+        const busyTimes = busyTimesResponse.data.calendcalendars[settings.calendarId || 'primary'].busy;
+        console.log("Busy Times from Google:", JSON.stringify(busyTimes, null, 2));
         const { meetingDuration, breakTime } = settings;
         const availabilitySettings = settings.availability || [];
 
@@ -101,63 +101,122 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             return res.status(400).send('Missing required calendar availability settings.');
         }
 
-        for (let day = 0; day < 7; day++) {
-            const currentDay = new Date(start);
-            currentDay.setDate(currentDay.getDate() + day);
-            const dayName = currentDay.toLocaleString('en-US', { weekday: 'long' });
+        const requestedSlotStart = new Date(startDate);
+        const requestedSlotEnd = new Date(requestedSlotStart.getTime() + meetingDuration * 60000);
 
-            const daySetting = availabilitySettings.find(s => s.day === dayName);
-            if (!daySetting) continue;
+        let requestedSlotAvailable = false;
+        let nextAvailableSlot = null;
 
-            for (const slot of daySetting.slots) {
-                let currentSlotStart = new Date(currentDay);
+        // Check if the requested slot is within the defined availability and not busy
+        const requestedDayName = requestedSlotStart.toLocaleString('en-US', { weekday: 'long' });
+        const daySettingForRequested = availabilitySettings.find(s => s.day === requestedDayName);
+
+        if (daySettingForRequested) {
+            const isInAvailableSlot = daySettingForRequested.slots.some(slot => {
+                const slotStart = new Date(requestedSlotStart);
                 const [startHour, startMinute] = slot.start.split(':').map(Number);
-                currentSlotStart.setHours(startHour, startMinute, 0, 0);
+                slotStart.setHours(startHour, startMinute, 0, 0);
 
-                const dayEnd = new Date(currentDay);
+                const slotEnd = new Date(requestedSlotStart);
                 const [endHour, endMinute] = slot.end.split(':').map(Number);
-                dayEnd.setHours(endHour, endMinute, 0, 0);
+                slotEnd.setHours(endHour, endMinute, 0, 0);
 
-            while (currentSlotStart < dayEnd) {
-                const currentSlotEnd = new Date(currentSlotStart.getTime() + meetingDuration * 60000);
-                if (currentSlotEnd > dayEnd) break;
+                return requestedSlotStart >= slotStart && requestedSlotEnd <= slotEnd;
+            });
 
-                const isOverlapping = busySlots.some(busy => {
-                    const busyStart = new Date(busy.start);
-                    const busyEnd = new Date(busy.end);
-                    return (currentSlotStart < busyEnd && currentSlotEnd > busyStart);
-                });
+            const isOverlapping = busyTimes.some(busy => {
+                const busyStart = new Date(busy.start);
+                const busyEnd = new Date(busy.end);
+                return (requestedSlotStart < busyEnd && requestedSlotEnd > busyStart);
+            });
 
-                if (!isOverlapping) {
-                    availableSlots.push({ start: currentSlotStart.toISOString(), end: currentSlotEnd.toISOString() });
-                }
-                currentSlotStart.setTime(currentSlotEnd.getTime() + (breakTime || 0) * 60000);
+            if (isInAvailableSlot && !isOverlapping) {
+                requestedSlotAvailable = true;
             }
         }
-        res.json({ availableSlots });
+
+        // Find the next available slot starting from the requested time
+        let searchDate = new Date(startDate);
+
+        for (let i = 0; i < 7 && !nextAvailableSlot; i++) { // Search up to 7 days
+            const dayName = searchDate.toLocaleString('en-US', { weekday: 'long' });
+            const daySetting = availabilitySettings.find(s => s.day === dayName);
+
+            if (daySetting) {
+                for (const slot of daySetting.slots) {
+                    let currentSlotStart = new Date(searchDate);
+                    const [startHour, startMinute] = slot.start.split(':').map(Number);
+                    currentSlotStart.setHours(startHour, startMinute, 0, 0);
+
+                    const dayEnd = new Date(searchDate);
+                    const [endHour, endMinute] = slot.end.split(':').map(Number);
+                    dayEnd.setHours(endHour, endMinute, 0, 0);
+
+                    // If it's the first day, start searching from the requested time
+                    if(i === 0 && currentSlotStart < requestedSlotStart) {
+                        currentSlotStart = requestedSlotStart;
+                    }
+
+                    while (currentSlotStart < dayEnd) {
+                        const currentSlotEnd = new Date(currentSlotStart.getTime() + meetingDuration * 60000);
+                        if (currentSlotEnd > dayEnd) break;
+
+                        const isOverlapping = busyTimes.some(busy => {
+                            const busyStart = new Date(busy.start).getTime() - (breakTime || 0) * 60000;
+                            const busyEnd = new Date(busy.end).getTime() + (breakTime || 0) * 60000;
+                            const currentStart = currentSlotStart.getTime();
+                            const currentEnd = currentSlotEnd.getTime();
+                            return (currentStart < busyEnd && currentEnd > busyStart);
+                        });
+
+                        if (!isOverlapping) {
+                            nextAvailableSlot = { start: currentSlotStart.toISOString(), end: currentSlotEnd.toISOString() };
+                            break; // Exit the while loop
+                        }
+                        currentSlotStart.setTime(currentSlotEnd.getTime() + (breakTime || 0) * 60000);
+                    }
+                    if (nextAvailableSlot) break; // Exit the slot loop
+                }
+            }
+            if (nextAvailableSlot) break; // Exit the day loop
+            searchDate.setDate(searchDate.getDate() + 1);
+            searchDate.setHours(0,0,0,0); // Start search from the beginning of the next day
+        }
+
+        res.json({
+            requestedSlotAvailable,
+            nextAvailableSlot
+        });
     } catch (error) {
         res.status(500).send('Failed to calculate availability.');
     }
 });
 
 router.post('/create-event', authenticateJWT, async (req, res) => {
-    const { flowId, startTime, endTime, summary, description, attendees } = req.body;
+    const { flowId, nodeId, startTime, endTime, summary, description, attendees } = req.body;
     try {
         const flow = await Flow.findById(flowId);
-        if (!flow || !flow.googleCalendar) return res.status(404).send('Flow or calendar settings not found.');
+        if (!flow) return res.status(404).send('Flow not found.');
+
+        const activeNode = flow.nodes.find(n => n.id === nodeId);
+        if (!activeNode || !activeNode.data || !activeNode.data.googleCalendar) {
+            return res.status(404).send('Google Calendar node settings not found.');
+        }
+        const settings = activeNode.data.googleCalendar;
 
         const oauth2Client = getOAuth2Client(req.user);
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
         const event = {
-            summary, description,
-            start: { dateTime: startTime, timeZone: 'America/Los_Angeles' }, // Should ideally get timezone from user settings
-            end: { dateTime: endTime, timeZone: 'America/Los_Angeles' },
+            summary: summary || settings.meetingSummary || 'Meeting Scheduled by Bot',
+            description,
+            start: { dateTime: startTime, timeZone: 'America/Los_Angeles' }, // Should be dynamic
+            end: { dateTime: endTime, timeZone: 'America/Los_Angeles' },   // Should be dynamic
             attendees: attendees ? attendees.filter(e => e).map(email => ({ email })) : [],
         };
 
         const response = await calendar.events.insert({
-            calendarId: flow.googleCalendar.calendarId || 'primary',
+            calendarId: settings.calendarId || 'primary',
             resource: event,
         });
         res.status(201).json(response.data);

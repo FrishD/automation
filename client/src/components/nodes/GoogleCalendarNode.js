@@ -159,6 +159,17 @@ const GoogleCalendarNode = ({ data, id }) => {
                                 ))}
                             </select>
                         </div>
+                        {/* Meeting Summary */}
+                        <div>
+                            <label className="block font-medium mb-1.5">Meeting Name</label>
+                            <input
+                                type="text"
+                                value={settings.meetingSummary || ''}
+                                onChange={(e) => updateSetting('meetingSummary', e.target.value)}
+                                placeholder="e.g., Introduction Call"
+                                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
+                            />
+                        </div>
                         {/* Availability */}
                         <div>
                             <label className="block font-medium mb-1.5">Availability</label>
