@@ -137,7 +137,7 @@ const GoogleCalendarNode = ({ data, id }) => {
                     <>
                         <div className="space-y-2">
                             <label className="block font-semibold text-dark-text mb-1">Language</label>
-                            <select value={settings.language || 'en'} onChange={(e) => updateSetting('language', e.target.value)} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition">
+                            <select value={settings.language || 'en'} onChange={(e) => updateSetting('language', e.target.value)} className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition">
                                 <option value="en">English</option>
                                 <option value="he">עברית</option>
                             </select>
@@ -145,7 +145,7 @@ const GoogleCalendarNode = ({ data, id }) => {
 
                         <div className="space-y-2">
                             <label className="block font-semibold text-dark-text mb-1">Calendar to use</label>
-                            <select value={settings.calendarId} onChange={(e) => updateSetting('calendarId', e.target.value)} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition">
+                            <select value={settings.calendarId} onChange={(e) => updateSetting('calendarId', e.target.value)} className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition">
                                 <option value="">Select a calendar</option>
                                 {calendars.map(cal => <option key={cal.id} value={cal.id}>{cal.summary}</option>)}
                             </select>
@@ -153,7 +153,7 @@ const GoogleCalendarNode = ({ data, id }) => {
 
                         <div className="space-y-2">
                             <label className="block font-semibold text-dark-text mb-1">Meeting Name</label>
-                            <input type="text" value={settings.meetingSummary || ''} onChange={(e) => updateSetting('meetingSummary', e.target.value)} placeholder="e.g., Introduction Call" className="w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition" />
+                            <input type="text" value={settings.meetingSummary || ''} onChange={(e) => updateSetting('meetingSummary', e.target.value)} placeholder="e.g., Introduction Call" className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition" />
                         </div>
 
                         <div>
@@ -162,7 +162,7 @@ const GoogleCalendarNode = ({ data, id }) => {
                                 {settings.availability.map((rule, ruleIndex) => (
                                     <div key={ruleIndex} className="p-3.5 bg-secondary-background border border-shadow-depth rounded-lg space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <select value={rule.day} onChange={(e) => handleAvailabilityChange(ruleIndex, 'day', e.target.value)} className="p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary">
+                                            <select value={rule.day} onChange={(e) => handleAvailabilityChange(ruleIndex, 'day', e.target.value)} className="nodrag p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary">
                                                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => <option key={day} value={day}>{day}</option>)}
                                             </select>
                                             <button onClick={() => removeAvailabilityRule(ruleIndex)} className="text-muted-gray hover:text-red-500 transition-colors">
@@ -171,9 +171,9 @@ const GoogleCalendarNode = ({ data, id }) => {
                                         </div>
                                         {rule.slots.map((slot, slotIndex) => (
                                             <div key={slotIndex} className="flex items-center gap-2">
-                                                <input type="time" value={slot.start} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'start', e.target.value)} className="w-full p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary" />
+                                                <input type="time" value={slot.start} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'start', e.target.value)} className="nodrag w-full p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary" />
                                                 <span className="text-muted-gray">-</span>
-                                                <input type="time" value={slot.end} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'end', e.target.value)} className="w-full p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary" />
+                                                <input type="time" value={slot.end} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'end', e.target.value)} className="nodrag w-full p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary" />
                                                 <button onClick={() => removeSlot(ruleIndex, slotIndex)} className="text-muted-gray hover:text-red-500 transition-colors">
                                                     <span className="material-symbols-outlined text-base">close</span>
                                                 </button>
@@ -191,11 +191,11 @@ const GoogleCalendarNode = ({ data, id }) => {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="block font-semibold">Duration (min)</label>
-                                <input type="number" value={settings.meetingDuration} onChange={(e) => updateSetting('meetingDuration', parseInt(e.target.value, 10))} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
+                                <input type="number" value={settings.meetingDuration} onChange={(e) => updateSetting('meetingDuration', parseInt(e.target.value, 10))} className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
                             </div>
                             <div className="space-y-2">
                                 <label className="block font-semibold">Break (min)</label>
-                                <input type="number" value={settings.breakTime} onChange={(e) => updateSetting('breakTime', parseInt(e.target.value, 10))} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
+                                <input type="number" value={settings.breakTime} onChange={(e) => updateSetting('breakTime', parseInt(e.target.value, 10))} className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
                             </div>
                         </div>
                     </>

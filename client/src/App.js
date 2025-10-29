@@ -28,6 +28,7 @@ import PlayAudioNode from './components/nodes/PlayAudioNode.js';
 import ConfirmationNode from './components/nodes/ConfirmationNode.js';
 import SummaryNode from './components/nodes/SummaryNode.js';
 import GoogleCalendarNode from './components/nodes/GoogleCalendarNode.js';
+import NoteNode from './components/nodes/NoteNode.js';
 import Notification from './components/Notification.js';
 import Modal from './components/Modal.js';
 import { TourProvider } from '@reactour/tour';
@@ -83,7 +84,7 @@ const FlowEditor = () => {
         start: StartNode, speak: SpeakNode, listen: ListenNode, condition: ConditionNode,
         end: EndNode, variable: VariableNode, wait: WaitNode, loop: LoopNode,
         play_audio: PlayAudioNode, confirmation: ConfirmationNode, summary: SummaryNode,
-        google_calendar: GoogleCalendarNode,
+        google_calendar: GoogleCalendarNode, note: NoteNode,
     }), []);
 
     const reactFlowWrapper = useRef(null);
@@ -103,9 +104,31 @@ const FlowEditor = () => {
     const [highlightedNode, setHighlightedNode] = useState(null);
     const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [nodeToDrag, setNodeToDrag] = useState(null);
 
     const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
     const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && nodeToDrag) {
+                const originalPosition = nodeToDrag.originalPosition;
+                setNodes(nodes.map(n => n.id === nodeToDrag.id ? { ...n, position: originalPosition } : n));
+                setNodeToDrag(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [nodeToDrag, nodes, setNodes]);
+
+    const onNodeDragStart = useCallback((event, node) => {
+        setNodeToDrag({ ...node, originalPosition: node.position });
+    }, []);
+
+    const onNodeDragStop = useCallback(() => {
+        setNodeToDrag(null);
+    }, []);
 
     const createNewFlow = useCallback(async () => {
         try {
@@ -186,7 +209,10 @@ const FlowEditor = () => {
             id: getId(),
             type,
             position,
-            data: { label: `${type} node` },
+            data: {
+              label: `${type} node`,
+              onChange: (newData) => onNodeDataChange(newNode.id, newData)
+            },
           };
 
           setNodes(nodes.concat(newNode));
@@ -259,6 +285,8 @@ const FlowEditor = () => {
                                 onInit={setReactFlowInstance}
                                 onDrop={onDrop}
                                 onDragOver={onDragOver}
+                                onNodeDragStart={onNodeDragStart}
+                                onNodeDragStop={onNodeDragStop}
                                 nodeTypes={nodeTypes}
                                 fitView
                             >

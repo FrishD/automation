@@ -33,6 +33,9 @@ const Sidebar = ({ onReset, className }) => {
     'Interaction': [
       { type: 'speak', icon: 'record_voice_over', name: 'Speak' },
       { type: 'listen', icon: 'hearing', name: 'Listen' },
+    ],
+    'Utility': [
+      { type: 'note', icon: 'note', name: 'Note' },
       { type: 'play_audio', icon: 'volume_up', name: 'Play Audio' },
       { type: 'wait', icon: 'timer', name: 'Wait' },
       { type: 'confirmation', icon: 'check_circle', name: 'Confirm' },
