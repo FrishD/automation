@@ -140,7 +140,6 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             return !isOverlapping;
         };
 
-        const requestedSlotStart = new Date(startDate);
         const requestedSlotEnd = new Date(requestedSlotStart.getTime() + meetingDuration * 60000);
         const requestedSlotAvailable = isSlotAvailable(requestedSlotStart, requestedSlotEnd);
 
