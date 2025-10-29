@@ -121,15 +121,10 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             }
 
             const isWithinRule = dayRule.slots.some(ruleSlot => {
-                const ruleStart = new Date(slotStart);
-                const [startHour, startMinute] = ruleSlot.start.split(':').map(Number);
-                ruleStart.setHours(startHour, startMinute, 0, 0);
+                const slotStartTime = slotStart.toLocaleTimeString('en-US', { hour12: false, timeZone: timeZone, hour: '2-digit', minute: '2-digit' });
+                const slotEndTime = slotEnd.toLocaleTimeString('en-US', { hour12: false, timeZone: timeZone, hour: '2-digit', minute: '2-digit' });
 
-                const ruleEnd = new Date(slotStart);
-                const [endHour, endMinute] = ruleSlot.end.split(':').map(Number);
-                ruleEnd.setHours(endHour, endMinute, 0, 0);
-
-                return slotStart >= ruleStart && slotEnd <= ruleEnd;
+                return slotStartTime >= ruleSlot.start && slotEndTime <= ruleSlot.end;
             });
 
             if (!isWithinRule) {
