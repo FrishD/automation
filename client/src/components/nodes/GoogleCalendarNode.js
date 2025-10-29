@@ -109,142 +109,101 @@ const GoogleCalendarNode = ({ data, id }) => {
     };
 
     return (
-        <div className="bg-surface-light dark:bg-surface-dark border-2 border-border-light dark:border-border-dark rounded-lg shadow-lg w-96 h-auto">
-            <Handle type="target" position={Position.Top} className="w-3 h-3 bg-slate-400" />
-            <div className="p-4 border-b border-border-light dark:border-border-dark flex items-center gap-3">
+        <div className="bg-white rounded-lg shadow-lg border border-shadow-depth w-96 text-dark-text">
+            <Handle type="target" position={Position.Top} className="w-3 h-3 !bg-accent" />
+
+            <div className="p-4 border-b border-shadow-depth flex items-center gap-3 bg-secondary-background rounded-t-lg">
                 <span className="material-symbols-outlined text-primary">calendar_month</span>
-                <h3 className="font-bold text-lg">Google Calendar</h3>
+                <h3 className="font-bold text-lg text-dark-text">Google Calendar</h3>
             </div>
-            <div className="p-4 space-y-4 text-sm overflow-y-auto">
+
+            <div className="p-5 space-y-5 text-sm max-h-96 overflow-y-auto">
                 {isLoading ? (
-                    <div className="flex justify-center items-center h-32">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <div className="flex justify-center items-center h-48">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
                     </div>
                 ) : !isAuthenticated ? (
-                    <div className="text-center p-4">
-                        <p className="mb-4 text-muted-light dark:text-muted-dark">Please connect your Google account to schedule meetings.</p>
+                    <div className="text-center p-5">
+                        <p className="mb-4 text-muted-gray">Please connect your Google account to schedule meetings.</p>
                         <a
                             href="http://localhost:5000/api/google-calendar/auth/google"
-                            className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-colors"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-primary-gradient-end transition-all"
                         >
                             <span className="material-symbols-outlined">link</span>
-                            Connect
+                            Connect Account
                         </a>
                     </div>
                 ) : (
                     <>
-                        {/* Language Select */}
-                        <div>
-                            <label className="block font-medium mb-1.5">Language</label>
-                            <select
-                                value={settings.language || 'en'}
-                                onChange={(e) => updateSetting('language', e.target.value)}
-                                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
-                            >
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-dark-text mb-1">Language</label>
+                            <select value={settings.language || 'en'} onChange={(e) => updateSetting('language', e.target.value)} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition">
                                 <option value="en">English</option>
                                 <option value="he">עברית</option>
                             </select>
                         </div>
-                        {/* Calendar Select */}
-                        <div>
-                            <label className="block font-medium mb-1.5">Calendar</label>
-                            <select
-                                value={settings.calendarId}
-                                onChange={(e) => updateSetting('calendarId', e.target.value)}
-                                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
-                            >
+
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-dark-text mb-1">Calendar to use</label>
+                            <select value={settings.calendarId} onChange={(e) => updateSetting('calendarId', e.target.value)} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition">
                                 <option value="">Select a calendar</option>
-                                {calendars.map(cal => (
-                                    <option key={cal.id} value={cal.id}>{cal.summary}</option>
-                                ))}
+                                {calendars.map(cal => <option key={cal.id} value={cal.id}>{cal.summary}</option>)}
                             </select>
                         </div>
-                        {/* Meeting Summary */}
-                        <div>
-                            <label className="block font-medium mb-1.5">Meeting Name</label>
-                            <input
-                                type="text"
-                                value={settings.meetingSummary || ''}
-                                onChange={(e) => updateSetting('meetingSummary', e.target.value)}
-                                placeholder="e.g., Introduction Call"
-                                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
-                            />
+
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-dark-text mb-1">Meeting Name</label>
+                            <input type="text" value={settings.meetingSummary || ''} onChange={(e) => updateSetting('meetingSummary', e.target.value)} placeholder="e.g., Introduction Call" className="w-full p-2.5 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary transition" />
                         </div>
-                        {/* Availability */}
+
                         <div>
-                            <label className="block font-medium mb-1.5">Availability</label>
+                            <label className="block font-semibold text-dark-text mb-2">Availability Rules</label>
                             <div className="space-y-3">
                                 {settings.availability.map((rule, ruleIndex) => (
-                                    <div key={ruleIndex} className="p-3 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md space-y-3">
+                                    <div key={ruleIndex} className="p-3.5 bg-secondary-background border border-shadow-depth rounded-lg space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <select
-                                                value={rule.day}
-                                                onChange={(e) => handleAvailabilityChange(ruleIndex, 'day', e.target.value)}
-                                                className="p-1.5 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-md"
-                                            >
-                                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day =>
-                                                    <option key={day} value={day}>{day}</option>
-                                                )}
+                                            <select value={rule.day} onChange={(e) => handleAvailabilityChange(ruleIndex, 'day', e.target.value)} className="p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary">
+                                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => <option key={day} value={day}>{day}</option>)}
                                             </select>
-                                            <button onClick={() => removeAvailabilityRule(ruleIndex)} className="text-muted-light dark:text-muted-dark hover:text-red-500 transition-colors">
+                                            <button onClick={() => removeAvailabilityRule(ruleIndex)} className="text-muted-gray hover:text-red-500 transition-colors">
                                                 <span className="material-symbols-outlined">delete</span>
                                             </button>
                                         </div>
                                         {rule.slots.map((slot, slotIndex) => (
                                             <div key={slotIndex} className="flex items-center gap-2">
-                                                <input type="time" value={slot.start} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'start', e.target.value)} className="w-full p-1.5 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-md" />
-                                                <span>-</span>
-                                                <input type="time" value={slot.end} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'end', e.target.value)} className="w-full p-1.5 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-md" />
-                                                <button onClick={() => removeSlot(ruleIndex, slotIndex)} className="text-muted-light dark:text-muted-dark hover:text-red-500 transition-colors">
-                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                <input type="time" value={slot.start} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'start', e.target.value)} className="w-full p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary" />
+                                                <span className="text-muted-gray">-</span>
+                                                <input type="time" value={slot.end} onChange={(e) => handleSlotChange(ruleIndex, slotIndex, 'end', e.target.value)} className="w-full p-2 border border-shadow-depth rounded-md bg-white focus:ring-2 focus:ring-primary" />
+                                                <button onClick={() => removeSlot(ruleIndex, slotIndex)} className="text-muted-gray hover:text-red-500 transition-colors">
+                                                    <span className="material-symbols-outlined text-base">close</span>
                                                 </button>
                                             </div>
                                         ))}
-                                        <button onClick={() => addSlot(ruleIndex)} className="text-sm text-primary hover:underline">+ Add time slot</button>
+                                        <button onClick={() => addSlot(ruleIndex)} className="text-sm font-semibold text-primary hover:underline">+ Add time slot</button>
                                     </div>
                                 ))}
-                                <button onClick={addAvailabilityRule} className="w-full mt-2 p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md hover:bg-opacity-70 transition-colors">
+                                <button onClick={addAvailabilityRule} className="w-full mt-2 py-2.5 bg-white border-2 border-dashed border-shadow-depth rounded-lg text-muted-gray hover:bg-secondary-background hover:text-primary transition-all">
                                     + Add Day
                                 </button>
                             </div>
                         </div>
-                        {/* Duration & Break */}
+
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block font-medium mb-1.5">Duration (min)</label>
-                                <input type="number" value={settings.meetingDuration} onChange={(e) => updateSetting('meetingDuration', parseInt(e.target.value, 10))} className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md" />
+                            <div className="space-y-2">
+                                <label className="block font-semibold">Duration (min)</label>
+                                <input type="number" value={settings.meetingDuration} onChange={(e) => updateSetting('meetingDuration', parseInt(e.target.value, 10))} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
                             </div>
-                            <div>
-                                <label className="block font-medium mb-1.5">Break (min)</label>
-                                <input type="number" value={settings.breakTime} onChange={(e) => updateSetting('breakTime', parseInt(e.target.value, 10))} className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md" />
+                            <div className="space-y-2">
+                                <label className="block font-semibold">Break (min)</label>
+                                <input type="number" value={settings.breakTime} onChange={(e) => updateSetting('breakTime', parseInt(e.target.value, 10))} className="w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
                             </div>
-                        </div>
-                        {/* Meeting Locations */}
-                        <div>
-                            <label className="block font-medium mb-1.5">Locations (comma-separated)</label>
-                            <input
-                                type="text"
-                                value={settings.meetingLocations}
-                                onChange={(e) => updateSetting('meetingLocations', e.target.value)}
-                                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
-                            />
-                        </div>
-                        {/* Max Meetings per Day */}
-                        <div>
-                            <label className="block font-medium mb-1.5">Max Meetings per Day (optional)</label>
-                            <input
-                                type="number"
-                                value={settings.maxMeetingsPerDay}
-                                onChange={(e) => updateSetting('maxMeetingsPerDay', parseInt(e.target.value, 10) || '')}
-                                min="1"
-                                className="w-full p-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-md"
-                            />
                         </div>
                     </>
                 )}
             </div>
-            <Handle type="source" position={Position.Bottom} id="success" className="w-3 h-3" style={{ left: '30%', backgroundColor: '#22c55e' }} />
-            <Handle type="source" position={Position.Bottom} id="failure" className="w-3 h-3" style={{ left: '70%', backgroundColor: '#ef4444' }} />
+
+            <Handle type="source" position={Position.Bottom} id="success" className="w-3 h-3 !bg-green-500" style={{ left: '30%' }} />
+            <Handle type="source" position={Position.Bottom} id="failure" className="w-3 h-3 !bg-red-500" style={{ left: '70%' }} />
         </div>
     );
 };

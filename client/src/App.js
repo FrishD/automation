@@ -211,15 +211,15 @@ const FlowEditor = () => {
 
             <ReactFlowProvider>
                 <Sidebar onReset={() => setIsResetModalOpen(true)} />
-                <main className={`flex-1 bg-background-light dark:bg-background-dark p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
-                    <div data-tour="canvas" className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col">
+                <main className={`flex-1 bg-secondary-background p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
+                    <div data-tour="canvas" className="h-full w-full bg-background rounded-xl relative overflow-hidden flex flex-col border border-shadow-depth">
                         <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
-                            <div className="header-controls flex items-center justify-between p-1.5 border-b">
+                            <div className="header-controls flex items-center justify-between p-2 border-b border-shadow-depth">
                                 <div className="flex items-center gap-1">
-                                    <button onClick={undoFlowState} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                                    <button onClick={undoFlowState} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray disabled:opacity-50">
                                         <span className="material-symbols-outlined text-lg">undo</span>
                                     </button>
-                                    <button onClick={redoFlowState} disabled={!canRedo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                                    <button onClick={redoFlowState} disabled={!canRedo} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray disabled:opacity-50">
                                         <span className="material-symbols-outlined text-lg">redo</span>
                                     </button>
                                 </div>
@@ -228,24 +228,24 @@ const FlowEditor = () => {
                                 type="text"
                                 value={flowName}
                                 onChange={(e) => setFlowName(e.target.value)}
-                                className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
+                                className="nodrag text-sm font-semibold text-dark-text bg-transparent text-center"
                                 />
-                                <div className="flex items-center gap-1.5 mr-1">
-                                    <button data-tour="simulate-button" onClick={handleSimulate} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                <div className="flex items-center gap-2 mr-1">
+                                    <button data-tour="simulate-button" onClick={handleSimulate} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">play_circle</span>
                                     </button>
-                                    <button data-tour="history-button" onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <button data-tour="history-button" onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">history</span>
                                     </button>
-                                    <button onClick={() => setIsSettingsModalOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <button onClick={() => setIsSettingsModalOpen(true)} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">settings</span>
                                     </button>
                                     <Tour />
-                                    <button data-tour="save-button" onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
+                                    <button data-tour="save-button" onClick={saveFlow} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-white hover:opacity-90">
                                         <span className="material-symbols-outlined text-base">save</span>
                                         <span>Save</span>
                                     </button>
-                                    <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">map</span>
                                     </button>
                                 </div>
@@ -264,7 +264,7 @@ const FlowEditor = () => {
                             >
                                 <Background />
                                 <Controls />
-                                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />}
+                                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-secondary-background/80 backdrop-blur-sm rounded-lg shadow-lg border border-shadow-depth overflow-hidden cursor-pointer" />}
                             </ReactFlow>
                         </div>
                     </div>
