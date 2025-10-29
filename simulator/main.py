@@ -275,11 +275,38 @@ class ConversationEngine:
 
                 # Use the correct search_dates function from the search module
                 from dateparser.search import search_dates
-                search_results = search_dates(user_response, languages=[language_code], settings={'TIMEZONE': 'Asia/Jerusalem', 'RETURN_AS_TIMEZONE_AWARE': True})
-                parsed_date = search_results[0][1] if search_results else None
+                # PREFER_DATES_FROM: 'future' will prevent parsing dates in the past.
+                # REQUIRE_PARTS: Ensures that a vague query like "the third" isn't parsed as the 3rd of the current month if it's in the past.
+                settings = {
+                    'TIMEZONE': 'Asia/Jerusalem',
+                    'RETURN_AS_TIMEZONE_AWARE': True,
+                    'PREFER_DATES_FROM': 'future',
+                    'REQUIRE_PARTS': ['day', 'month']
+                }
+                search_results = search_dates(user_response, languages=[language_code], settings=settings)
+
+                # Find the first valid, complete date from the results.
+                parsed_date = None
+                if search_results:
+                    for _, dt in search_results:
+                        # Reject dates that are obviously in the past (double check)
+                        if dt > datetime.now(pytz.timezone('Asia/Jerusalem')):
+                            parsed_date = dt
+                            break
 
                 if not parsed_date:
-                    speak("I'm sorry, I didn't understand that date. Please try again.")
+                    # A more robust check for invalid dates like "February 30th" or "October 40th".
+                    # We can try to parse it with datetime to see if it's a real date.
+                    try:
+                        # Attempt to parse the user's response to see if it's a valid date.
+                        # This is a fallback and might not be perfect, but it's better than the string check.
+                        from dateutil.parser import parse
+                        parse(user_response)
+                        # If it parses but wasn't caught by dateparser's future-preferring logic, it's likely in the past.
+                        speak("I'm sorry, I could only find a date in the past. Please provide a future date and time.")
+                    except (ValueError, TypeError):
+                        # This triggers if the date is impossible (e.g., "October 40th")
+                        speak("I'm sorry, that date seems to be invalid. Please provide a valid date.")
                     continue
 
                 try:

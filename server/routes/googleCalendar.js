@@ -111,32 +111,41 @@ router.post('/availability', authenticateJWT, async (req, res) => {
 
         const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
 
+        // Helper to get day of the week (0-6) in a specific timezone, as JS `getDay()` uses server's local time.
+        const getDayInTimezone = (date, tz) => {
+            const dayName = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long' }).format(date);
+            return dayMap[dayName];
+        };
+
+        // Helper to get time string (HH:mm) in a specific timezone.
+        const getTimeStringInTimezone = (date, tz) => {
+            return date.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+        };
+
         const isSlotAvailable = (slotStart, slotEnd) => {
-            // 1. Check if it's within any availability rule
-            const dayOfWeek = slotStart.getDay();
-            const dayRule = availabilitySettings.find(rule => dayMap[rule.day] === dayOfWeek);
+            // 1. Check against availability rules in the correct timezone.
+            const dayOfWeekInTZ = getDayInTimezone(slotStart, timeZone);
+            const dayRule = availabilitySettings.find(rule => dayMap[rule.day] === dayOfWeekInTZ);
 
             if (!dayRule) {
-                return false; // Not available on this day
+                return false; // Not available on this day of the week.
             }
 
+            const slotStartTimeStr = getTimeStringInTimezone(slotStart, timeZone);
+            const slotEndTimeStr = getTimeStringInTimezone(slotEnd, timeZone);
+
+            // Check if the slot is within any of the defined time ranges for that day.
             const isWithinRule = dayRule.slots.some(ruleSlot => {
-                const ruleStart = new Date(slotStart);
-                const [startHour, startMinute] = ruleSlot.start.split(':').map(Number);
-                ruleStart.setHours(startHour, startMinute, 0, 0);
-
-                const ruleEnd = new Date(slotStart);
-                const [endHour, endMinute] = ruleSlot.end.split(':').map(Number);
-                ruleEnd.setHours(endHour, endMinute, 0, 0);
-
-                return slotStart >= ruleStart && slotEnd <= ruleEnd;
+                // String comparison 'HH:mm' >= 'HH:mm' works correctly.
+                return slotStartTimeStr >= ruleSlot.start && slotEndTimeStr <= ruleSlot.end;
             });
 
             if (!isWithinRule) {
-                return false; // Not within the defined hours for this day
+                return false; // Not within the defined hours for this day.
             }
 
-            // 2. Check if it overlaps with any busy times
+            // 2. Check if it overlaps with any busy times from the Google Calendar API.
+            // This comparison is safe with Date objects as they are absolute UTC timestamps.
             const isOverlapping = busyTimes.some(busy => {
                 const busyStart = new Date(busy.start);
                 const busyEnd = new Date(busy.end);
@@ -150,55 +159,34 @@ router.post('/availability', authenticateJWT, async (req, res) => {
 
         let nextAvailableSlot = null;
         if (!requestedSlotAvailable) {
-            let searchStart = new Date(startDate);
-            // If the requested time is in the past, start searching from now
-            if (searchStart < new Date()) {
-                searchStart = new Date();
+            // Start searching from the requested date, or from now if the request is in the past.
+            let potentialSlotStart = new Date(startDate);
+            if (potentialSlotStart < new Date()) {
+                potentialSlotStart = new Date();
             }
 
-            // Search for the next 14 days
-            for (let i = 0; i < 14; i++) {
-                const dayOfWeek = searchStart.getDay();
-                const dayRule = availabilitySettings.find(rule => dayMap[rule.day] === dayOfWeek);
+            // Round up to the next 15-minute interval to avoid suggesting a time that's just passed.
+            const minutes = potentialSlotStart.getMinutes();
+            potentialSlotStart.setMinutes(Math.ceil(minutes / 15) * 15, 0, 0);
 
-                if (dayRule) {
-                    for (const ruleSlot of dayRule.slots) {
-                        const ruleStart = new Date(searchStart);
-                        const [startHour, startMinute] = ruleSlot.start.split(':').map(Number);
-                        ruleStart.setHours(startHour, startMinute, 0, 0);
+            const searchLimit = new Date(potentialSlotStart);
+            searchLimit.setDate(searchLimit.getDate() + 14); // Search for the next 14 days.
 
-                        const ruleEnd = new Date(searchStart);
-                        const [endHour, endMinute] = ruleSlot.end.split(':').map(Number);
-                        ruleEnd.setHours(endHour, endMinute, 0, 0);
+            // Iterate through time and test each slot until we find one that is available.
+            while (potentialSlotStart < searchLimit) {
+                const potentialSlotEnd = new Date(potentialSlotStart.getTime() + meetingDuration * 60000);
 
-                        let potentialSlotStart = new Date(Math.max(searchStart.getTime(), ruleStart.getTime()));
-
-                        while (potentialSlotStart < ruleEnd) {
-                            const potentialSlotEnd = new Date(potentialSlotStart.getTime() + meetingDuration * 60000);
-
-                            if (potentialSlotEnd > ruleEnd) {
-                                break; // Slot extends beyond the rule's end time
-                            }
-
-                            if (isSlotAvailable(potentialSlotStart, potentialSlotEnd)) {
-                                nextAvailableSlot = {
-                                    start: potentialSlotStart.toISOString(),
-                                    end: potentialSlotEnd.toISOString(),
-                                };
-                                break; // Found a slot
-                            }
-
-                            // Move to the next potential slot, incrementing by 15 minutes for efficiency
-                            potentialSlotStart.setTime(potentialSlotStart.getTime() + 15 * 60000);
-                        }
-                    }
+                if (isSlotAvailable(potentialSlotStart, potentialSlotEnd)) {
+                    nextAvailableSlot = {
+                        start: potentialSlotStart.toISOString(),
+                        end: potentialSlotEnd.toISOString(),
+                    };
+                    break; // Found a valid slot.
                 }
-                if (nextAvailableSlot) {
-                    break;
-                }
-                // Move to the start of the next day
-                searchStart.setDate(searchStart.getDate() + 1);
-                searchStart.setHours(0, 0, 0, 0);
+
+                // Move to the next potential slot, using the break time as the increment.
+                const increment = (breakTime || 15) * 60000;
+                potentialSlotStart.setTime(potentialSlotStart.getTime() + increment);
             }
         }
 
