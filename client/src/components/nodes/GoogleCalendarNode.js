@@ -56,12 +56,6 @@ const GoogleCalendarNode = ({ data, id }) => {
                 if (response.status === 200) {
                     setIsAuthenticated(true);
                     setCalendars(response.data);
-                    if (!settings.calendarId && response.data.length > 0) {
-                        const primary = response.data.find(cal => cal.primary);
-                        if (primary) {
-                            updateSetting('calendarId', primary.id);
-                        }
-                    }
                 }
             } catch (error) {
                 setIsAuthenticated(false);
@@ -72,7 +66,16 @@ const GoogleCalendarNode = ({ data, id }) => {
         };
 
         checkAuthAndFetchCalendars();
-    }, [settings.calendarId, updateSetting]);
+    }, []);
+
+    useEffect(() => {
+        if (!settings.calendarId && calendars.length > 0) {
+            const primary = calendars.find(cal => cal.primary);
+            if (primary) {
+                updateSetting('calendarId', primary.id);
+            }
+        }
+    }, [calendars, settings.calendarId, updateSetting]);
 
 
     const handleAvailabilityChange = (ruleIndex, field, value) => {
