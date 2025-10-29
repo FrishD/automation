@@ -217,7 +217,7 @@ const FlowEditor = () => {
 
           setNodes(nodes.concat(newNode));
         },
-        [reactFlowInstance, nodes, setNodes],
+        [reactFlowInstance, nodes, setNodes, onNodeDataChange],
       );
 
     const handleSimulate = useCallback(async () => {

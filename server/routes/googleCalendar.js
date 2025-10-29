@@ -92,8 +92,7 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             },
         });
 
-        const busyTimes = busyTimesResponse.data.calendcalendars[settings.calendarId || 'primary'].busy;
-        console.log("Busy Times from Google:", JSON.stringify(busyTimes, null, 2));
+        const busyTimes = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy;
         const { meetingDuration, breakTime } = settings;
         const availabilitySettings = settings.availability || [];
 

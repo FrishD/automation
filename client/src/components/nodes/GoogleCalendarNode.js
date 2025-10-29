@@ -198,6 +198,16 @@ const GoogleCalendarNode = ({ data, id }) => {
                                 <input type="number" value={settings.breakTime} onChange={(e) => updateSetting('breakTime', parseInt(e.target.value, 10))} className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
                             </div>
                         </div>
+
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-dark-text mb-1">Locations (comma-separated)</label>
+                            <input type="text" value={settings.meetingLocations} onChange={(e) => updateSetting('meetingLocations', e.target.value)} placeholder="e.g., Office, Google Meet" className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-dark-text mb-1">Max Meetings per Day</label>
+                            <input type="number" value={settings.maxMeetingsPerDay} onChange={(e) => updateSetting('maxMeetingsPerDay', parseInt(e.target.value, 10) || '')} min="1" className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
+                        </div>
                     </>
                 )}
             </div>
