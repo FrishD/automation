@@ -28,6 +28,7 @@ import PlayAudioNode from './components/nodes/PlayAudioNode.js';
 import ConfirmationNode from './components/nodes/ConfirmationNode.js';
 import SummaryNode from './components/nodes/SummaryNode.js';
 import GoogleCalendarNode from './components/nodes/GoogleCalendarNode.js';
+import NoteNode from './components/nodes/NoteNode.js';
 import Notification from './components/Notification.js';
 import Modal from './components/Modal.js';
 import { TourProvider } from '@reactour/tour';
@@ -83,7 +84,7 @@ const FlowEditor = () => {
         start: StartNode, speak: SpeakNode, listen: ListenNode, condition: ConditionNode,
         end: EndNode, variable: VariableNode, wait: WaitNode, loop: LoopNode,
         play_audio: PlayAudioNode, confirmation: ConfirmationNode, summary: SummaryNode,
-        google_calendar: GoogleCalendarNode,
+        google_calendar: GoogleCalendarNode, note: NoteNode,
     }), []);
 
     const reactFlowWrapper = useRef(null);
@@ -103,9 +104,31 @@ const FlowEditor = () => {
     const [highlightedNode, setHighlightedNode] = useState(null);
     const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [nodeToDrag, setNodeToDrag] = useState(null);
 
     const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
     const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
+
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && nodeToDrag) {
+                const originalPosition = nodeToDrag.originalPosition;
+                setNodes(nodes.map(n => n.id === nodeToDrag.id ? { ...n, position: originalPosition } : n));
+                setNodeToDrag(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [nodeToDrag, nodes, setNodes]);
+
+    const onNodeDragStart = useCallback((event, node) => {
+        setNodeToDrag({ ...node, originalPosition: node.position });
+    }, []);
+
+    const onNodeDragStop = useCallback(() => {
+        setNodeToDrag(null);
+    }, []);
 
     const createNewFlow = useCallback(async () => {
         try {
@@ -186,12 +209,15 @@ const FlowEditor = () => {
             id: getId(),
             type,
             position,
-            data: { label: `${type} node` },
+            data: {
+              label: `${type} node`,
+              onChange: (newData) => onNodeDataChange(newNode.id, newData)
+            },
           };
 
           setNodes(nodes.concat(newNode));
         },
-        [reactFlowInstance, nodes, setNodes],
+        [reactFlowInstance, nodes, setNodes, onNodeDataChange],
       );
 
     const handleSimulate = useCallback(async () => {
@@ -211,15 +237,15 @@ const FlowEditor = () => {
 
             <ReactFlowProvider>
                 <Sidebar onReset={() => setIsResetModalOpen(true)} />
-                <main className={`flex-1 bg-background-light dark:bg-background-dark p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
-                    <div data-tour="canvas" className="h-full w-full bg-surface-light dark:bg-surface-dark rounded-xl relative overflow-hidden flex flex-col">
+                <main className={`flex-1 bg-secondary-background p-6 ${isSimulatorOpen ? 'simulator-open' : ''}`}>
+                    <div data-tour="canvas" className="h-full w-full bg-background rounded-xl relative overflow-hidden flex flex-col border border-shadow-depth">
                         <div ref={reactFlowWrapper} className="flex-grow relative cursor-grab active:cursor-grabbing">
-                            <div className="header-controls flex items-center justify-between p-1.5 border-b">
+                            <div className="header-controls flex items-center justify-between p-2 border-b border-shadow-depth">
                                 <div className="flex items-center gap-1">
-                                    <button onClick={undoFlowState} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                                    <button onClick={undoFlowState} disabled={!canUndo} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray disabled:opacity-50">
                                         <span className="material-symbols-outlined text-lg">undo</span>
                                     </button>
-                                    <button onClick={redoFlowState} disabled={!canRedo} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-50">
+                                    <button onClick={redoFlowState} disabled={!canRedo} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray disabled:opacity-50">
                                         <span className="material-symbols-outlined text-lg">redo</span>
                                     </button>
                                 </div>
@@ -228,24 +254,24 @@ const FlowEditor = () => {
                                 type="text"
                                 value={flowName}
                                 onChange={(e) => setFlowName(e.target.value)}
-                                className="nodrag text-sm font-medium text-on-surface-light dark:text-on-surface-dark bg-transparent text-center"
+                                className="nodrag text-sm font-semibold text-dark-text bg-transparent text-center"
                                 />
-                                <div className="flex items-center gap-1.5 mr-1">
-                                    <button data-tour="simulate-button" onClick={handleSimulate} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                <div className="flex items-center gap-2 mr-1">
+                                    <button data-tour="simulate-button" onClick={handleSimulate} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">play_circle</span>
                                     </button>
-                                    <button data-tour="history-button" onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <button data-tour="history-button" onClick={() => setIsHistoryPanelOpen(true)} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">history</span>
                                     </button>
-                                    <button onClick={() => setIsSettingsModalOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <button onClick={() => setIsSettingsModalOpen(true)} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">settings</span>
                                     </button>
                                     <Tour />
-                                    <button data-tour="save-button" onClick={saveFlow} className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-primary text-white hover:bg-primary/90">
+                                    <button data-tour="save-button" onClick={saveFlow} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-white hover:opacity-90">
                                         <span className="material-symbols-outlined text-base">save</span>
                                         <span>Save</span>
                                     </button>
-                                    <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <button onClick={() => setShowMinimap(!showMinimap)} className="p-1.5 rounded-md hover:bg-secondary-background text-muted-gray">
                                         <span className="material-symbols-outlined text-lg">map</span>
                                     </button>
                                 </div>
@@ -259,12 +285,14 @@ const FlowEditor = () => {
                                 onInit={setReactFlowInstance}
                                 onDrop={onDrop}
                                 onDragOver={onDragOver}
+                                onNodeDragStart={onNodeDragStart}
+                                onNodeDragStop={onNodeDragStop}
                                 nodeTypes={nodeTypes}
                                 fitView
                             >
                                 <Background />
                                 <Controls />
-                                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer" />}
+                                {showMinimap && <MiniMap className="absolute top-4 right-4 z-20 w-48 h-32 bg-secondary-background/80 backdrop-blur-sm rounded-lg shadow-lg border border-shadow-depth overflow-hidden cursor-pointer" />}
                             </ReactFlow>
                         </div>
                     </div>

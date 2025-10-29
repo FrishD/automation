@@ -7,13 +7,13 @@ const onDragStart = (event, nodeType) => {
 
 const Block = ({ type, icon, name }) => (
     <div
-        className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-background-light dark:bg-background-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 cursor-pointer transition-all"
+        className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-white hover:bg-secondary-background border border-shadow-depth cursor-pointer transition-all"
         onDragStart={(event) => onDragStart(event, type)}
         draggable
         data-testid={`dnd-node-${type}`}
     >
         <span className="material-symbols-outlined text-primary text-2xl">{icon}</span>
-        <span className="font-medium text-xs text-center">{name}</span>
+        <span className="font-semibold text-xs text-center text-dark-text">{name}</span>
     </div>
 );
 
@@ -33,6 +33,9 @@ const Sidebar = ({ onReset, className }) => {
     'Interaction': [
       { type: 'speak', icon: 'record_voice_over', name: 'Speak' },
       { type: 'listen', icon: 'hearing', name: 'Listen' },
+    ],
+    'Utility': [
+      { type: 'note', icon: 'note', name: 'Note' },
       { type: 'play_audio', icon: 'volume_up', name: 'Play Audio' },
       { type: 'wait', icon: 'timer', name: 'Wait' },
       { type: 'confirmation', icon: 'check_circle', name: 'Confirm' },
@@ -52,15 +55,15 @@ const Sidebar = ({ onReset, className }) => {
   }, {});
 
   return (
-    <aside data-tour="palette" className={`w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col ${className}`}>
-        <div className="p-4 border-b border-border-light dark:border-border-dark">
-            <h1 className="text-lg font-bold text-on-surface-light dark:text-on-surface-dark">Palette</h1>
+    <aside data-tour="palette" className={`w-64 bg-background border-r border-shadow-depth flex flex-col ${className}`}>
+        <div className="p-4 border-b border-shadow-depth">
+            <h1 className="text-xl font-bold text-dark-text">Palette</h1>
         </div>
         <div className="p-4">
             <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-light dark:text-muted-dark text-xl">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-gray text-xl">search</span>
                 <input
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-border-light dark:border-border-dark rounded-lg bg-transparent focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-shadow-depth rounded-lg bg-white focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Search blocks..."
                   type="text"
                   value={searchTerm}
@@ -72,7 +75,7 @@ const Sidebar = ({ onReset, className }) => {
             <div className="space-y-6">
               {Object.keys(filteredBlocks).map(category => (
                 <div key={category}>
-                    <h3 className="px-2 mb-2 text-xs font-semibold uppercase text-muted-light dark:text-muted-dark tracking-wider">{category}</h3>
+                    <h3 className="px-2 mb-2 text-xs font-semibold uppercase text-muted-gray tracking-wider">{category}</h3>
                     <div className="grid grid-cols-2 gap-2">
                       {filteredBlocks[category].map(block => (
                         <Block key={block.type} {...block} />
@@ -82,10 +85,10 @@ const Sidebar = ({ onReset, className }) => {
               ))}
             </div>
         </div>
-        <div className="p-4 border-t border-border-light dark:border-border-dark">
+        <div className="p-4 border-t border-shadow-depth">
             <button
                 onClick={onReset}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-md border border-shadow-depth hover:bg-secondary-background text-dark-text transition-colors"
             >
                 <span className="material-symbols-outlined text-base">refresh</span>
                 <span>Reset Canvas</span>

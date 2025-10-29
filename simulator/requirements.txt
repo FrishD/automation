@@ -8,3 +8,4 @@ dateparser
 regex
 langdetect
 edge-tts
+Babel

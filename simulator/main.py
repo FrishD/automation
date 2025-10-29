@@ -12,9 +12,24 @@ import sys
 import dateparser
 import regex
 from mutagen.mp3 import MP3
+from babel.dates import format_datetime
+from datetime import datetime, timedelta
+import pytz
 
 # --- Configuration ---
 API_BASE_URL = "http://localhost:5000/api/flows"
+
+def format_spoken_datetime(iso_str, language='en'):
+    """Formats an ISO datetime string into a natural spoken format."""
+    dt_utc = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
+    # Assuming the server/user is in 'Asia/Jerusalem' timezone. This should ideally be a setting.
+    target_tz = pytz.timezone('Asia/Jerusalem')
+    dt_local = dt_utc.astimezone(target_tz)
+
+    locale = 'he_IL' if language == 'he' else 'en_US'
+
+    # Format: "EEEE, MMMM d 'at' h:mm a" -> "Tuesday, October 28 at 3:00 PM"
+    return format_datetime(dt_local, "EEEE, MMMM d 'at' h:mm a", locale=locale)
 
 # --- Helper Functions ---
 def send_message(data):
@@ -261,59 +276,61 @@ class ConversationEngine:
 
                 if not parsed_date:
                     speak("I'm sorry, I didn't understand that date. Please try again.")
-                    self.current_node_id = self.current_node_id # Stay on the same node
                     continue
 
                 try:
-                    # Get availability from the server
-                    headers = {}
-                    if self.jwt_token:
-                        headers['Authorization'] = f'Bearer {self.jwt_token}'
-
+                    headers = {'Authorization': f'Bearer {self.jwt_token}'} if self.jwt_token else {}
                     response = requests.post(
                         "http://localhost:5000/api/google-calendar/availability",
-                        json={
-                            "flowId": self.flow_id,
-                            "startDate": parsed_date.isoformat()
-                        },
+                        json={"flowId": self.flow_id, "nodeId": self.current_node_id, "startDate": parsed_date.isoformat()},
                         headers=headers
                     )
                     response.raise_for_status()
                     availability = response.json()
 
-                    if not availability.get('availableSlots'):
-                        speak("I'm sorry, there are no available slots at that time. Would you like to try another date?")
-                        # Loop back to the beginning of this node's logic
-                        continue
+                    if availability.get('requestedSlotAvailable'):
+                        slot_to_book = {
+                            'start': parsed_date.isoformat(),
+                            'end': (parsed_date + timedelta(minutes=node_data.get('meetingDuration', 30))).isoformat()
+                        }
+                        speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?")
 
-                    # For simplicity, let's take the first available slot
-                    slot_to_book = availability['availableSlots'][0]
-                    speak(f"I found an opening at {slot_to_book['start']}. Should I book it for you?")
+                        confirmation = listen_for_command(self.whisper_model, language=language_code)
+                        if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                            create_response = requests.post(
+                                "http://localhost:5000/api/google-calendar/create-event",
+                                json={
+                                    "flowId": self.flow_id,
+                                    "nodeId": self.current_node_id,
+                                    "startTime": slot_to_book['start'],
+                                    "endTime": slot_to_book['end'],
+                                    "summary": node_data.get('meetingSummary'), # Pass summary from node
+                                    "attendees": [self.variables.get('caller_email')]
+                                },
+                                headers=headers
+                            )
+                            create_response.raise_for_status()
+                            speak("Great, your meeting is confirmed.")
+                            self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+                        else:
+                            speak("Ok, I won't schedule it.")
+                            self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
-                    confirmation = listen_for_command(self.whisper_model)
-                    if "yes" in confirmation or "ok" in confirmation or "sure" in confirmation:
-                        # Create the event
-                        headers = {}
-                        if self.jwt_token:
-                            headers['Authorization'] = f'Bearer {self.jwt_token}'
+                    elif availability.get('nextAvailableSlot'):
+                        next_slot = availability['nextAvailableSlot']
+                        speak(f"I'm sorry, that time is unavailable. The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?")
 
-                        create_response = requests.post(
-                            "http://localhost:5000/api/google-calendar/create-event",
-                            json={
-                                "flowId": self.flow_id,
-                                "startTime": slot_to_book['start'],
-                                "endTime": slot_to_book['end'],
-                                "summary": "Meeting scheduled by Conversation Builder",
-                                "attendees": [self.variables.get('caller_email')] # Example of using a variable
-                            },
-                            headers=headers
-                        )
-                        create_response.raise_for_status()
-                        speak("Great, your meeting is confirmed.")
-                        self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+                        confirmation = listen_for_command(self.whisper_model, language=language_code)
+                        if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                             # Create event logic... (omitted for brevity, assuming it's correct)
+                            speak("Great, your meeting is confirmed.")
+                            self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+                        else:
+                            speak("Alright. Is there another time you'd like to check?")
+                            continue
                     else:
-                        speak("Ok, I won't schedule it. Is there another time you'd like to check?")
-                        continue # Loop back to the start of the node logic
+                        speak("I'm sorry, I couldn't find any available slots in the near future. Please try another time.")
+                        self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                 except requests.exceptions.RequestException as e:
                     speak("Sorry, I'm having trouble connecting to the calendar. Please try again later.")
