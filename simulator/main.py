@@ -275,7 +275,7 @@ class ConversationEngine:
 
                 # Use the correct search_dates function from the search module
                 from dateparser.search import search_dates
-                search_results = search_dates(user_response, languages=[language_code])
+                search_results = search_dates(user_response, languages=[language_code], settings={'TIMEZONE': 'Asia/Jerusalem', 'RETURN_AS_TIMEZONE_AWARE': True})
                 parsed_date = search_results[0][1] if search_results else None
 
                 if not parsed_date:
