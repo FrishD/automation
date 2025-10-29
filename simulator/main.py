@@ -272,7 +272,10 @@ class ConversationEngine:
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
                 send_message({"type": "debug", "message": f"Trying to parse date from user response: '{user_response}'"})
-                search_results = dateparser.search.search_dates(user_response, languages=[language_code])
+
+                # Use the correct search_dates function from the search module
+                from dateparser.search import search_dates
+                search_results = search_dates(user_response, languages=[language_code])
                 parsed_date = search_results[0][1] if search_results else None
 
                 if not parsed_date:
