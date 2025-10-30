@@ -10,6 +10,7 @@ import edge_tts
 import json
 import sys
 import dateparser
+from dateparser.search import search_dates
 import regex
 from mutagen.mp3 import MP3
 from babel.dates import format_datetime
@@ -115,7 +116,7 @@ def extract_entity(text, entity_type, language='en'):
 
     if entity_type == 'date':
         # Use dateparser for robust date extraction
-        parsed_date = dateparser.search.search_dates(text, languages=[language])
+        parsed_date = search_dates(text, languages=[language])
         return parsed_date[0][1].strftime('%Y-%m-%d') if parsed_date else None
 
     if entity_type == 'time' or entity_type == 'hour':
@@ -270,14 +271,17 @@ class ConversationEngine:
                 speak(prompt_text, language=language_code)
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
-                send_message({"type": "debug", "message": f"Trying to parse date from user response: '{user_response}'"})
+                # Clean the response to help the parser
+                cleaned_response = user_response.replace('.', '')
+                send_message({"type": "debug", "message": f"Trying to parse date from cleaned user response: '{cleaned_response}'"})
+
 
                 settings = {
                     'TIMEZONE': 'Asia/Jerusalem',
                     'RETURN_AS_TIMEZONE_AWARE': True,
                     'PREFER_DATES_FROM': 'future',
                 }
-                search_results = dateparser.search.search_dates(user_response, languages=[language_code], settings=settings)
+                search_results = search_dates(cleaned_response, languages=[language_code], settings=settings)
                 parsed_date = search_results[0][1] if search_results else None
                 send_message({"type": "debug", "message": f"Parsed date: {parsed_date.isoformat() if parsed_date else 'None'}"})
 
