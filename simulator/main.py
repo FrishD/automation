@@ -264,10 +264,14 @@ class ConversationEngine:
                 self.current_node_id = None
 
             elif node_type == 'google_calendar':
-                language_code = node_data.get('language', self.variables.get('language', 'en'))
+                # Explicitly use the language defined in the node's data, defaulting to 'en'.
+                language_code = node_data.get('language', 'en')
+                self.variables['language'] = language_code  # Update global language context.
                 send_message({"type": "debug", "message": f"Google Calendar Node: Language set to '{language_code}'"})
 
                 prompt_text = "מתי תרצה לקבוע את הפגישה? למשל, 'מחר בשלוש'." if language_code == 'he' else "When would you like to book the meeting? For example, 'tomorrow at 3pm'."
+
+                # Ensure the correct language is passed to both speak and listen.
                 speak(prompt_text, language=language_code)
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
@@ -308,11 +312,10 @@ class ConversationEngine:
                             'start': parsed_date.isoformat(),
                             'end': (parsed_date + timedelta(minutes=node_data.get('meetingDuration', 30))).isoformat()
                         }
+                        # PROCEED_WITH_BOOKING_LOGIC
                         speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?", language=language_code)
-
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
                         if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
-                            # Simplified payload, server now handles the details
                             event_payload = {
                                 "flowId": self.flow_id,
                                 "nodeId": self.current_node_id,
@@ -320,12 +323,7 @@ class ConversationEngine:
                                 "endTime": slot_to_book['end'],
                                 "attendees": [self.variables.get('caller_email')]
                             }
-                            send_message({"type": "debug", "message": f"Sending to /create-event: {json.dumps(event_payload)}"})
-                            create_response = requests.post(
-                                "http://localhost:5000/api/google-calendar/create-event",
-                                json=event_payload,
-                                headers=headers
-                            )
+                            create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
                             create_response.raise_for_status()
                             speak("Great, your meeting is confirmed.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
@@ -333,31 +331,37 @@ class ConversationEngine:
                             speak("Ok, I won't schedule it.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
-                    elif availability.get('nextAvailableSlot'):
-                        next_slot = availability['nextAvailableSlot']
-                        speak(f"I'm sorry, that time is unavailable. The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?", language=language_code)
+                    else: # Not available, check reason
+                        reason = availability.get('reason')
+                        next_slot = availability.get('nextAvailableSlot')
 
-                        confirmation = listen_for_command(self.whisper_model, language=language_code)
-                        if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
-                            # Simplified payload for the next available slot
-                            event_payload = {
-                                "flowId": self.flow_id,
-                                "nodeId": self.current_node_id,
-                                "startTime": next_slot['start'],
-                                "endTime": next_slot['end'],
-                                "attendees": [self.variables.get('caller_email')]
-                            }
-                            send_message({"type": "debug", "message": f"Sending to /create-event: {json.dumps(event_payload)}"})
-                            create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
-                            create_response.raise_for_status()
-                            speak("Great, your meeting is confirmed.", language=language_code)
-                            self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+                        if reason == 'OUT_OF_HOURS' and availability.get('workingHours'):
+                            hours = availability['workingHours'][0] # Assuming one slot for simplicity
+                            speak(f"That time is outside of business hours. On that day, hours are from {hours['start']} to {hours['end']}.", language=language_code)
+                        else: # Busy or other reasons
+                             speak("I'm sorry, that time is unavailable.", language=language_code)
+
+                        if next_slot:
+                            speak(f"The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?", language=language_code)
+                            confirmation = listen_for_command(self.whisper_model, language=language_code)
+                            if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                                event_payload = {
+                                    "flowId": self.flow_id,
+                                    "nodeId": self.current_node_id,
+                                    "startTime": next_slot['start'],
+                                    "endTime": next_slot['end'],
+                                    "attendees": [self.variables.get('caller_email')]
+                                }
+                                create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
+                                create_response.raise_for_status()
+                                speak("Great, your meeting is confirmed.", language=language_code)
+                                self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+                            else:
+                                speak("Alright. Is there another time you'd like to check?", language=language_code)
+                                continue # Re-ask the initial question
                         else:
-                            speak("Alright. Is there another time you'd like to check?", language=language_code)
-                            continue
-                    else:
-                        speak("I'm sorry, I couldn't find any available slots in the near future. Please try another time.", language=language_code)
-                        self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
+                             speak("I couldn't find any other available slots in the near future.", language=language_code)
+                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                 except requests.exceptions.RequestException as e:
                     error_message = str(e.response.text) if e.response else str(e)
