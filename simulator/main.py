@@ -36,16 +36,14 @@ def send_message(data):
     """Sends a JSON message to stdout."""
     print(json.dumps(data), flush=True)
 
-def speak(text):
+def speak(text, language='en'):
     """Converts text to speech and plays it."""
     duration = 0
     temp_file = ""
+    send_message({"type": "debug", "message": f"Speak function called with language: {language}"})
     try:
-        # Detect language
-        if any('\u0590' <= c <= '\u05FF' for c in text):
-            voice = "he-IL-HilaNeural"
-        else:
-            voice = "en-US-AriaNeural"
+        # Use the specified language
+        voice = "he-IL-HilaNeural" if language == 'he' else "en-US-AriaNeural"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
             temp_file = fp.name
@@ -190,17 +188,16 @@ class ConversationEngine:
 
             elif node_type == 'speak':
                 text_to_speak = node_data.get('text', 'No text configured.')
+                language_code = node_data.get('language', self.variables.get('language', 'en'))
 
                 # Perform variable substitution
                 def replace_var(match):
                     var_name = match.group(1).strip()
-                    # Return the value from self.variables, or the original placeholder if not found.
-                    # Ensure the returned value is a string.
                     return str(self.variables.get(var_name, f"{{{var_name}}}"))
 
                 processed_text = regex.sub(r'\{([^}]+)\}', replace_var, text_to_speak)
 
-                speak(processed_text)
+                speak(processed_text, language=language_code)
                 self.current_node_id = self._find_next_node_id(self.current_node_id)
 
             elif node_type == 'listen':
@@ -267,78 +264,101 @@ class ConversationEngine:
 
             elif node_type == 'google_calendar':
                 language_code = node_data.get('language', self.variables.get('language', 'en'))
+                send_message({"type": "debug", "message": f"Google Calendar Node: Language set to '{language_code}'"})
+
                 prompt_text = "מתי תרצה לקבוע את הפגישה? למשל, 'מחר בשלוש'." if language_code == 'he' else "When would you like to book the meeting? For example, 'tomorrow at 3pm'."
-                speak(prompt_text)
+                speak(prompt_text, language=language_code)
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
                 send_message({"type": "debug", "message": f"Trying to parse date from user response: '{user_response}'"})
 
-                # Use the correct search_dates function from the search module
-                from dateparser.search import search_dates
-                search_results = search_dates(user_response, languages=[language_code], settings={'TIMEZONE': 'Asia/Jerusalem', 'RETURN_AS_TIMEZONE_AWARE': True})
+                settings = {
+                    'TIMEZONE': 'Asia/Jerusalem',
+                    'RETURN_AS_TIMEZONE_AWARE': True,
+                    'PREFER_DATES_FROM': 'future',
+                }
+                search_results = dateparser.search.search_dates(user_response, languages=[language_code], settings=settings)
                 parsed_date = search_results[0][1] if search_results else None
+                send_message({"type": "debug", "message": f"Parsed date: {parsed_date.isoformat() if parsed_date else 'None'}"})
 
-                if not parsed_date:
-                    speak("I'm sorry, I didn't understand that date. Please try again.")
+                if not parsed_date or parsed_date < datetime.now(pytz.timezone('Asia/Jerusalem')):
+                    speak("I'm sorry, I couldn't find a valid future date in your request. Please try again.", language=language_code)
                     continue
 
                 try:
                     headers = {'Authorization': f'Bearer {self.jwt_token}'} if self.jwt_token else {}
+                    api_payload = {"flowId": self.flow_id, "nodeId": self.current_node_id, "startDate": parsed_date.isoformat()}
+                    send_message({"type": "debug", "message": f"Sending to /availability: {json.dumps(api_payload)}"})
                     response = requests.post(
                         "http://localhost:5000/api/google-calendar/availability",
-                        json={"flowId": self.flow_id, "nodeId": self.current_node_id, "startDate": parsed_date.isoformat()},
+                        json=api_payload,
                         headers=headers
                     )
                     response.raise_for_status()
                     availability = response.json()
+                    send_message({"type": "debug", "message": f"Received from /availability: {json.dumps(availability)}"})
+
 
                     if availability.get('requestedSlotAvailable'):
                         slot_to_book = {
                             'start': parsed_date.isoformat(),
                             'end': (parsed_date + timedelta(minutes=node_data.get('meetingDuration', 30))).isoformat()
                         }
-                        speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?")
+                        speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?", language=language_code)
 
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
                         if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                            # Simplified payload, server now handles the details
+                            event_payload = {
+                                "flowId": self.flow_id,
+                                "nodeId": self.current_node_id,
+                                "startTime": slot_to_book['start'],
+                                "endTime": slot_to_book['end'],
+                                "attendees": [self.variables.get('caller_email')]
+                            }
+                            send_message({"type": "debug", "message": f"Sending to /create-event: {json.dumps(event_payload)}"})
                             create_response = requests.post(
                                 "http://localhost:5000/api/google-calendar/create-event",
-                                json={
-                                    "flowId": self.flow_id,
-                                    "nodeId": self.current_node_id,
-                                    "startTime": slot_to_book['start'],
-                                    "endTime": slot_to_book['end'],
-                                    "summary": node_data.get('meetingSummary'), # Pass summary from node
-                                    "attendees": [self.variables.get('caller_email')]
-                                },
+                                json=event_payload,
                                 headers=headers
                             )
                             create_response.raise_for_status()
-                            speak("Great, your meeting is confirmed.")
+                            speak("Great, your meeting is confirmed.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
                         else:
-                            speak("Ok, I won't schedule it.")
+                            speak("Ok, I won't schedule it.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                     elif availability.get('nextAvailableSlot'):
                         next_slot = availability['nextAvailableSlot']
-                        speak(f"I'm sorry, that time is unavailable. The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?")
+                        speak(f"I'm sorry, that time is unavailable. The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?", language=language_code)
 
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
                         if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
-                             # Create event logic... (omitted for brevity, assuming it's correct)
-                            speak("Great, your meeting is confirmed.")
+                            # Simplified payload for the next available slot
+                            event_payload = {
+                                "flowId": self.flow_id,
+                                "nodeId": self.current_node_id,
+                                "startTime": next_slot['start'],
+                                "endTime": next_slot['end'],
+                                "attendees": [self.variables.get('caller_email')]
+                            }
+                            send_message({"type": "debug", "message": f"Sending to /create-event: {json.dumps(event_payload)}"})
+                            create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
+                            create_response.raise_for_status()
+                            speak("Great, your meeting is confirmed.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
                         else:
-                            speak("Alright. Is there another time you'd like to check?")
+                            speak("Alright. Is there another time you'd like to check?", language=language_code)
                             continue
                     else:
-                        speak("I'm sorry, I couldn't find any available slots in the near future. Please try another time.")
+                        speak("I'm sorry, I couldn't find any available slots in the near future. Please try another time.", language=language_code)
                         self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                 except requests.exceptions.RequestException as e:
-                    speak("Sorry, I'm having trouble connecting to the calendar. Please try again later.")
-                    send_message({"type": "error", "message": str(e)})
+                    error_message = str(e.response.text) if e.response else str(e)
+                    send_message({"type": "error", "message": error_message})
+                    speak("Sorry, I'm having trouble connecting to the calendar. Please try again later.", language=language_code)
                     self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
 
