@@ -264,14 +264,10 @@ class ConversationEngine:
                 self.current_node_id = None
 
             elif node_type == 'google_calendar':
-                # Explicitly use the language defined in the node's data, defaulting to 'en'.
                 language_code = node_data.get('language', 'en')
-                self.variables['language'] = language_code  # Update global language context.
                 send_message({"type": "debug", "message": f"Google Calendar Node: Language set to '{language_code}'"})
 
                 prompt_text = "מתי תרצה לקבוע את הפגישה? למשל, 'מחר בשלוש'." if language_code == 'he' else "When would you like to book the meeting? For example, 'tomorrow at 3pm'."
-
-                # Ensure the correct language is passed to both speak and listen.
                 speak(prompt_text, language=language_code)
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
@@ -283,8 +279,9 @@ class ConversationEngine:
                 settings = {
                     'TIMEZONE': 'Asia/Jerusalem',
                     'RETURN_AS_TIMEZONE_AWARE': True,
-                    'PREFER_DATES_FROM': 'future',
+                    'PREFER_DATES_FROM': 'future'
                 }
+                # Add PREFER_DATES_FROM to correctly handle times like "9am"
                 search_results = search_dates(cleaned_response, languages=[language_code], settings=settings)
                 parsed_date = search_results[0][1] if search_results else None
                 send_message({"type": "debug", "message": f"Parsed date: {parsed_date.isoformat() if parsed_date else 'None'}"})
@@ -336,8 +333,10 @@ class ConversationEngine:
                         next_slot = availability.get('nextAvailableSlot')
 
                         if reason == 'OUT_OF_HOURS' and availability.get('workingHours'):
-                            hours = availability['workingHours'][0] # Assuming one slot for simplicity
-                            speak(f"That time is outside of business hours. On that day, hours are from {hours['start']} to {hours['end']}.", language=language_code)
+                            # Handle multiple time slots in a day
+                            hours_list = availability['workingHours']
+                            hours_str = " and ".join([f"from {slot['start']} to {slot['end']}" for slot in hours_list])
+                            speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language=language_code)
                         else: # Busy or other reasons
                              speak("I'm sorry, that time is unavailable.", language=language_code)
 
