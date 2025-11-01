@@ -242,14 +242,24 @@ class ConversationEngine:
                         if not variable_name or not source_type:
                             continue
 
-                        # Logic for 'listen' source
-                        if node_type == 'listen':
-                             extracted_value = extract_entity(user_input_from_listen, source_type, language)
-                             self.variables[variable_name] = extracted_value
-                             send_message({
+                        # Logic for 'listen' or 'condition' source (they both use the user's last utterance)
+                        if node_type in ['listen', 'condition']:
+                            value_map = {
+                                'user_response': user_input_from_listen,
+                                # In the future, we might extract which specific condition was met
+                                'condition_matched': user_input_from_listen
+                            }
+                            extracted_value = value_map.get(source_type)
+
+                            # If it's a generic type, try standard entity extraction
+                            if not extracted_value:
+                                extracted_value = extract_entity(user_input_from_listen, source_type, language)
+
+                            self.variables[variable_name] = extracted_value
+                            send_message({
                                 "type": "variable_update", "name": variable_name,
                                 "value": extracted_value, "status": "extracted" if extracted_value else "failed"
-                             })
+                            })
 
                     # Then, skip over it to the *next* node in the flow.
                     self.current_node_id = self._find_next_node_id(next_node_id)

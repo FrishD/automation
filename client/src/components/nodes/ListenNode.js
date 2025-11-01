@@ -1,26 +1,32 @@
+
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 
-const ListenNode = ({ data }) => {
+const ListenNode = ({ data, selected }) => {
   return (
     <div
-      data-tour="listen-node-example"
-      className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border cursor-pointer z-10 w-56 transition-all duration-300 ${
-        data.isHighlighted ? 'glow' : 'border-slate-200 dark:border-slate-700'
+      className={`relative bg-white dark:bg-slate-800 shadow-lg border rounded-lg w-64 text-sm transition-all duration-300 ${
+        data.isHighlighted ? 'glow' : selected ? 'border-primary ring-4 ring-primary/20' : 'border-slate-200 dark:border-slate-700'
       }`}
     >
-      <div className="flex items-center gap-3">
-        <span className="material-symbols-outlined text-primary text-2xl">hearing</span>
-        <span className="font-semibold text-sm">Listen</span>
+      <Handle type="target" position={Position.Left} className="w-3 h-3 !bg-slate-400" />
+
+      <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-t-lg">
+        <span className="material-symbols-outlined text-primary text-xl">hearing</span>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-200">Listen</h3>
       </div>
-      <div className="space-y-3 pt-3 border-t border-border-light dark:border-border-dark">
-        <p className="text-xs text-muted-light dark:text-muted-dark">Waits for the user to speak and captures their response.</p>
-        <div>
-          <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="language">Language</label>
+
+      <div className="p-4 space-y-4">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Waits for the user to speak, captures their response, and optionally extracts data.
+        </p>
+
+        <div className="space-y-2">
+          <label className="block font-semibold text-xs text-slate-600 dark:text-slate-300" htmlFor={`language-${data.id}`}>Language</label>
           <select
-            id="language"
-            className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
-            defaultValue={data.language || 'en'}
+            id={`language-${data.id}`}
+            className="nodrag w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-primary"
+            value={data.language || 'en'}
             onChange={(e) => data.onChange({ ...data, language: e.target.value })}
           >
             <option value="en">English</option>
@@ -28,22 +34,20 @@ const ListenNode = ({ data }) => {
           </select>
         </div>
       </div>
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
-      />
+
       <Handle
         type="source"
         position={Position.Right}
         id="condition"
-        className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
+        className="w-3 h-3 !bg-slate-400"
+        style={{ top: '50%' }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="variable"
-        className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-slate-800"
+        className="w-3 h-3 !bg-green-500"
+        style={{ left: '50%' }}
       />
     </div>
   );

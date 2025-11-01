@@ -191,29 +191,34 @@ const FlowEditor = () => {
         }
     }, [currentFlowId, flowName, nodes, edges]);
 
-    const onConnect = useCallback((params) => {
-        const { source, target } = params;
-        const sourceNode = nodes.find(node => node.id === source);
-        const targetNode = nodes.find(node => node.id === target);
+    useEffect(() => {
+        const nodesMap = new Map(nodes.map(node => [node.id, node]));
+        const updatedNodes = nodes.map(node => {
+            if (node.type === 'variable') {
+                const incomingEdge = edges.find(edge => edge.target === node.id);
+                const sourceNode = incomingEdge ? nodesMap.get(incomingEdge.source) : null;
+                const newSourceType = sourceNode ? sourceNode.type : null;
 
-        if (targetNode && targetNode.type === 'variable' && sourceNode) {
-            const updatedNodes = nodes.map(node => {
-                if (node.id === target) {
+                if (node.data.sourceNodeType !== newSourceType) {
                     return {
                         ...node,
                         data: {
                             ...node.data,
-                            sourceNodeType: sourceNode.type,
-                        },
+                            sourceNodeType: newSourceType,
+                        }
                     };
                 }
-                return node;
-            });
+            }
+            return node;
+        });
+
+        // Only update if there are actual changes to prevent loops
+        if (JSON.stringify(nodes) !== JSON.stringify(updatedNodes)) {
             setNodes(updatedNodes);
         }
+    }, [edges, nodes, setNodes]);
 
-        setEdges(addEdge(params, edges));
-    }, [nodes, edges, setNodes, setEdges]);
+    const onConnect = useCallback((params) => setEdges(addEdge(params, edges)), [edges, setEdges]);
 
     const onDragOver = useCallback((event) => {
         event.preventDefault();
