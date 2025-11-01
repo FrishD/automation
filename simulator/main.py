@@ -32,11 +32,16 @@ def format_spoken_datetime(iso_str, language='en'):
     # Format: "EEEE, MMMM d 'at' h:mm a" -> "Tuesday, October 28 at 3:00 PM"
     return format_datetime(dt_local, "EEEE, MMMM d 'at' h:mm a", locale=locale)
 
-def format_spoken_time(time_str):
+def format_spoken_time(time_str, language='en'):
     """Formats a 'HH:MM' string into a spoken format, e.g., '5 PM'."""
     try:
         time_obj = datetime.strptime(time_str, '%H:%M')
-        return time_obj.strftime('%I:%M %p').lstrip('0').replace(':00', '')
+        if language == 'he':
+            # Format for Hebrew (e.g., "17:00")
+            return time_obj.strftime('%H:%M')
+        else:
+            # Format for English (e.g., "5:00 PM")
+            return time_obj.strftime('%I:%M %p').lstrip('0').replace(':00', '')
     except ValueError:
         return time_str # Fallback
 
@@ -229,18 +234,22 @@ class ConversationEngine:
 
                 # Check if the next node is a variable node for processing
                 if next_node and next_node.get('type') == 'variable':
-                    # It's a variable node, so perform extraction as a side-effect.
-                    extraction_type = next_node.get('data', {}).get('extractionType', 'full_text')
-                    variable_name = next_node.get('data', {}).get('variableName')
-                    if variable_name:
-                        extracted_value = extract_entity(user_input_from_listen, extraction_type, language)
-                        self.variables[variable_name] = extracted_value
-                        send_message({
-                            "type": "variable_update",
-                            "name": variable_name,
-                            "value": extracted_value,
-                            "status": "extracted" if extracted_value else "failed"
-                        })
+                    # It's a variable node, so perform extraction.
+                    assignments = next_node.get('data', {}).get('assignments', [])
+                    for assignment in assignments:
+                        variable_name = assignment.get('variableName')
+                        source_type = assignment.get('sourceType')
+                        if not variable_name or not source_type:
+                            continue
+
+                        # Logic for 'listen' source
+                        if node_type == 'listen':
+                             extracted_value = extract_entity(user_input_from_listen, source_type, language)
+                             self.variables[variable_name] = extracted_value
+                             send_message({
+                                "type": "variable_update", "name": variable_name,
+                                "value": extracted_value, "status": "extracted" if extracted_value else "failed"
+                             })
 
                     # Then, skip over it to the *next* node in the flow.
                     self.current_node_id = self._find_next_node_id(next_node_id)
@@ -259,12 +268,20 @@ class ConversationEngine:
                         break
 
                 if not next_node_found:
-                    speak("I didn't understand. Could you please repeat?")
-                    listen_nodes = [nid for nid, n in self.nodes.items() if n['type'] == 'listen']
-                    if listen_nodes:
-                        self.current_node_id = listen_nodes[-1]
+                    # If no condition matched, check for a default path (no source handle)
+                    default_next_node = self._find_next_node_id(self.current_node_id, source_handle=None)
+                    if default_next_node:
+                        self.current_node_id = default_next_node
                     else:
-                        break
+                        # Fallback behavior if no default path is set
+                        speak("I didn't understand. Could you please repeat?", language=self.variables.get('language', 'en'))
+                        # Attempt to loop back to the last listen node to re-prompt the user
+                        listen_nodes = [nid for nid, n in self.nodes.items() if n['type'] == 'listen']
+                        if listen_nodes:
+                            # This logic might be too simplistic; finding the *correct* listen node is key
+                            self.current_node_id = listen_nodes[-1]
+                        else:
+                            break # End if no listen node to go back to
 
             elif node_type == 'end':
                 end_text = node_data.get('text', 'Conversation ended.')
@@ -275,7 +292,14 @@ class ConversationEngine:
                 language_code = node_data.get('language', 'en') # Prioritize node-specific language
                 send_message({"type": "debug", "message": f"Google Calendar Node: Language set to '{language_code}'"})
 
-                prompt_text = "מתי תרצה לקבוע את הפגישה? למשל, 'מחר בשלוש'." if language_code == 'he' else "When would you like to book the meeting? For example, 'tomorrow at 3pm'."
+                # --- Variable Substitution Helper ---
+                def replace_var(match):
+                    var_name = match.group(1).strip()
+                    return str(self.variables.get(var_name, f"{{{var_name}}}"))
+
+                # --- Prompt with variable substitution ---
+                base_prompt_text = node_data.get('prompt', "מתי תרצה לקבוע את הפגישה?") if language_code == 'he' else node_data.get('prompt', "When would you like to book the meeting?")
+                prompt_text = regex.sub(r'\{([^}]+)\}', replace_var, base_prompt_text)
                 speak(prompt_text, language=language_code)
                 user_response = listen_for_command(self.whisper_model, language=language_code)
 
@@ -319,17 +343,50 @@ class ConversationEngine:
                         speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?", language=language_code)
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
                         if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+
+                            summary_template = node_data.get('googleCalendar', {}).get('meetingSummary', 'Meeting')
+                            description_template = node_data.get('googleCalendar', {}).get('meetingDescription', '')
+
+                            summary = regex.sub(r'\{([^}]+)\}', replace_var, summary_template)
+                            description = regex.sub(r'\{([^}]+)\}', replace_var, description_template)
+
                             event_payload = {
                                 "flowId": self.flow_id,
                                 "nodeId": self.current_node_id,
                                 "startTime": slot_to_book['start'],
                                 "endTime": slot_to_book['end'],
-                                "attendees": [self.variables.get('caller_email')]
+                                "attendees": [self.variables.get('caller_email')],
+                                "summary": summary,
+                                "description": description
                             }
                             create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
                             create_response.raise_for_status()
+                            created_event = create_response.json()
+
+                            # --- Post-creation variable assignment ---
+                            next_node_after_success = self._find_next_node_id(self.current_node_id, source_handle='success')
+                            if next_node_after_success and self.nodes.get(next_node_after_success, {}).get('type') == 'variable':
+                                assignments = self.nodes[next_node_after_success].get('data', {}).get('assignments', [])
+                                for assignment in assignments:
+                                    var_name = assignment.get('variableName')
+                                    source_type = assignment.get('sourceType')
+                                    if not var_name or not source_type: continue
+
+                                    value_map = {
+                                        'event_start_time': created_event.get('start', {}).get('dateTime'),
+                                        'event_end_time': created_event.get('end', {}).get('dateTime'),
+                                        'event_summary': created_event.get('summary'),
+                                        'event_description': created_event.get('description'),
+                                        'event_location': created_event.get('location'),
+                                    }
+                                    if source_type in value_map:
+                                        self.variables[var_name] = value_map[source_type]
+                                self.current_node_id = self._find_next_node_id(next_node_after_success) # Skip variable node
+                            else:
+                                self.current_node_id = next_node_after_success
+
                             speak("Great, your meeting is confirmed.", language=language_code)
-                            self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
+
                         else:
                             speak("Ok, I won't schedule it.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
@@ -339,7 +396,7 @@ class ConversationEngine:
 
                         if reason == 'OUT_OF_HOURS' and availability.get('workingHours'):
                             hours_list = availability['workingHours']
-                            hours_str = " and ".join([f"from {format_spoken_time(slot['start'])} to {format_spoken_time(slot['end'])}" for slot in hours_list])
+                            hours_str = " and ".join([f"from {format_spoken_time(slot['start'], language_code)} to {format_spoken_time(slot['end'], language_code)}" for slot in hours_list])
                             speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language=language_code)
                         else:
                             speak("I'm sorry, that time is unavailable.", language=language_code)

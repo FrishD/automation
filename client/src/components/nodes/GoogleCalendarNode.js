@@ -23,6 +23,7 @@ const GoogleCalendarNode = ({ data, id }) => {
         meetingLocations: '', // Stored as a comma-separated string in the UI
         maxMeetingsPerDay: '',
         ...data.googleCalendar,
+        language: data.language || 'en',
     });
     const [calendars, setCalendars] = useState([]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -32,12 +33,21 @@ const GoogleCalendarNode = ({ data, id }) => {
     const updateSetting = useCallback((key, value) => {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
+
         if (data.onChange) {
-            if (key === 'meetingLocations') {
-                data.onChange({ ...data, googleCalendar: { ...newSettings, meetingLocations: value.split(',').map(s => s.trim()).filter(Boolean) } });
-            } else {
-                data.onChange({ ...data, googleCalendar: newSettings });
+            const { language, ...googleCalendarSettings } = newSettings;
+
+            // The UI uses a string for locations, but the data model might need an array.
+            // This ensures consistency.
+            if (typeof googleCalendarSettings.meetingLocations === 'string') {
+                googleCalendarSettings.meetingLocations = googleCalendarSettings.meetingLocations.split(',').map(s => s.trim()).filter(Boolean);
             }
+
+            data.onChange({
+                ...data,
+                language: language || 'en',
+                googleCalendar: googleCalendarSettings
+            });
         }
     }, [data, settings]);
 
@@ -171,7 +181,11 @@ const GoogleCalendarNode = ({ data, id }) => {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="block font-semibold text-dark-text">Meeting Name</label>
-                                        <input type="text" value={settings.meetingSummary || ''} onChange={(e) => updateSetting('meetingSummary', e.target.value)} placeholder="e.g., Introduction Call" className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
+                                        <input type="text" value={settings.meetingSummary || ''} onChange={(e) => updateSetting('meetingSummary', e.target.value)} placeholder="e.g., Introduction Call with {contact_name}" className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block font-semibold text-dark-text">Description</label>
+                                        <textarea value={settings.meetingDescription || ''} onChange={(e) => updateSetting('meetingDescription', e.target.value)} placeholder="e.g., Discuss project {project_name} details." className="nodrag w-full p-2.5 border border-shadow-depth rounded-md bg-white h-24 resize-none"></textarea>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="block font-semibold text-dark-text">Locations (comma-separated)</label>

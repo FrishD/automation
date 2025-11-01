@@ -205,8 +205,8 @@ router.post('/availability', authenticateJWT, async (req, res) => {
 });
 
 router.post('/create-event', authenticateJWT, async (req, res) => {
-    // The simulator will now only send the essential, confirmed details.
-    const { flowId, nodeId, startTime, endTime, attendees } = req.body;
+    // The simulator sends all necessary data, including the final summary and description
+    const { flowId, nodeId, startTime, endTime, attendees, summary, description } = req.body;
     console.log('\n--- Create Event Started (Server-Side Logic) ---');
     console.log('Request Body:', JSON.stringify(req.body, null, 2));
 
@@ -224,10 +224,6 @@ router.post('/create-event', authenticateJWT, async (req, res) => {
         }
         const settings = activeNode.data.googleCalendar;
         console.log('Using Calendar Settings from Node:', JSON.stringify(settings, null, 2));
-
-        // The server is now responsible for gathering the summary and description from the node's settings.
-        const summary = settings.meetingSummary || 'Meeting Scheduled by Bot';
-        const description = settings.meetingDescription || 'Scheduled via automated assistant.';
 
         const oauth2Client = getOAuth2Client(req.user);
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client });

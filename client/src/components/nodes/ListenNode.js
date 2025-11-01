@@ -19,7 +19,7 @@ const ListenNode = ({ data }) => {
           <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="language">Language</label>
           <select
             id="language"
-            className="mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+            className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
             defaultValue={data.language || 'en'}
             onChange={(e) => data.onChange({ ...data, language: e.target.value })}
           >
