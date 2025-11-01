@@ -1,0 +1,11 @@
+openai-whisper
+gTTS
+requests
+PyAudio
+playsound==1.2.2
+mutagen
+dateparser
+regex
+langdetect
+edge-tts
+Babel
