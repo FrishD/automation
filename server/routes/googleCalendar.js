@@ -106,8 +106,13 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             },
         });
 
-        const busyTimes = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy;
-        console.log('Busy Times from Google:', JSON.stringify(busyTimes, null, 2));
+        const busyTimesWithBreaks = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy.map(busy => {
+            const busyEnd = new Date(busy.end);
+            busyEnd.setMinutes(busyEnd.getMinutes() + (settings.breakTime || 0));
+            return { ...busy, end: busyEnd.toISOString() };
+        });
+        const busyTimes = busyTimesWithBreaks;
+        console.log('Busy Times (with breaks):', JSON.stringify(busyTimes, null, 2));
 
         const { meetingDuration, breakTime } = settings;
         const availabilitySettings = settings.availability || [];
@@ -132,41 +137,29 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             return date.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
         };
 
-        const isSlotAvailable = (slotStart, slotEnd) => {
-            console.log(`\nChecking slot: ${slotStart.toISOString()} to ${slotEnd.toISOString()}`);
-
+        const checkSlotAvailability = (slotStart, slotEnd) => {
             const dayOfWeekInTZ = getDayInTimezone(slotStart, timeZone);
             const dayRule = availabilitySettings.find(rule => dayMap[rule.day] === dayOfWeekInTZ);
-            console.log(`Day of week in TZ (${timeZone}): ${dayOfWeekInTZ}, Found Rule:`, dayRule ? JSON.stringify(dayRule) : 'None');
-            if (!dayRule) return false;
+            if (!dayRule) return { available: false, reason: 'NO_RULE_FOR_DAY' };
 
             const slotStartTimeStr = getTimeStringInTimezone(slotStart, timeZone);
             const slotEndTimeStr = getTimeStringInTimezone(slotEnd, timeZone);
-            console.log(`Slot time in TZ (${timeZone}): ${slotStartTimeStr} - ${slotEndTimeStr}`);
 
-            const isWithinRule = dayRule.slots.some(ruleSlot => {
-                const check = slotStartTimeStr >= ruleSlot.start && slotEndTimeStr <= ruleSlot.end;
-                console.log(`  - Checking against rule slot ${ruleSlot.start}-${ruleSlot.end}: ${check}`);
-                return check;
-            });
-            console.log(`Is within any rule slot? ${isWithinRule}`);
-            if (!isWithinRule) return false;
+            const isWithinRule = dayRule.slots.some(ruleSlot => slotStartTimeStr >= ruleSlot.start && slotEndTimeStr <= ruleSlot.end);
+            if (!isWithinRule) return { available: false, reason: 'OUT_OF_HOURS', workingHours: dayRule.slots };
 
             const isOverlapping = busyTimes.some(busy => {
                 const busyStart = new Date(busy.start);
                 const busyEnd = new Date(busy.end);
-                const overlap = (slotStart < busyEnd && slotEnd > busyStart);
-                if (overlap) console.log(`  - Overlaps with busy slot: ${busy.start} - ${busy.end}`);
-                return overlap;
+                return (slotStart < busyEnd && slotEnd > busyStart);
             });
-            console.log(`Is overlapping with a busy slot? ${isOverlapping}`);
+            if (isOverlapping) return { available: false, reason: 'BUSY' };
 
-            const isAvailable = !isOverlapping;
-            console.log(`Slot is available? ${isAvailable}`);
-            return isAvailable;
+            return { available: true };
         };
 
-        const requestedSlotAvailable = isSlotAvailable(requestedSlotStart, requestedSlotEnd);
+        const availabilityResult = checkSlotAvailability(requestedSlotStart, requestedSlotEnd);
+        const requestedSlotAvailable = availabilityResult.available;
 
         let nextAvailableSlot = null;
         if (!requestedSlotAvailable) {
@@ -186,23 +179,24 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             // Iterate through time and test each slot until we find one that is available.
             while (potentialSlotStart < searchLimit) {
                 const potentialSlotEnd = new Date(potentialSlotStart.getTime() + meetingDuration * 60000);
+                const { available } = checkSlotAvailability(potentialSlotStart, potentialSlotEnd);
 
-                if (isSlotAvailable(potentialSlotStart, potentialSlotEnd)) {
+                if (available) {
                     nextAvailableSlot = {
                         start: potentialSlotStart.toISOString(),
                         end: potentialSlotEnd.toISOString(),
                     };
-                    break; // Found a valid slot.
+                    break;
                 }
 
-                // Move to the next potential slot, using the break time as the increment.
-                const increment = (breakTime || 15) * 60000;
-                potentialSlotStart.setTime(potentialSlotStart.getTime() + increment);
+                potentialSlotStart.setTime(potentialSlotStart.getTime() + 15 * 60000); // Always increment by 15 minutes
             }
         }
 
         res.json({
             requestedSlotAvailable,
+            reason: availabilityResult.reason,
+            workingHours: availabilityResult.workingHours,
             nextAvailableSlot
         });
     } catch (error) {
