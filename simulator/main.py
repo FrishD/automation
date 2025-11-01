@@ -40,6 +40,21 @@ def format_spoken_time(time_str):
     except ValueError:
         return time_str # Fallback
 
+from transformers import pipeline
+
+# --- Global NER Pipelines ---
+NER_PIPELINES = {}
+
+def initialize_ner():
+    """Loads NER models for supported languages."""
+    send_message({"type": "debug", "message": "Initializing NER models..."})
+    try:
+        NER_PIPELINES['en'] = pipeline("token-classification", model="dslim/bert-base-NER", tokenizer="dslim/bert-base-NER")
+        NER_PIPELINES['he'] = pipeline("token-classification", model="avichr/heBERT_NER", tokenizer="avichr/heBERT_NER")
+        send_message({"type": "debug", "message": "NER models initialized successfully."})
+    except Exception as e:
+        send_message({"type": "error", "message": f"Failed to initialize NER models: {e}"})
+
 # --- Helper Functions ---
 def send_message(data):
     """Sends a JSON message to stdout."""
@@ -114,32 +129,99 @@ def listen_for_command(model, language=None):
         send_message({"type": "error", "message": f"Recognition error: {e}"})
         return ""
 
-def extract_entity(text, entity_type, language='en'):
-    """Extracts a specific entity from the given text."""
+def extract_entities(text, language='en'):
+    """
+    Extracts all named entities from the text using the appropriate NER model.
+    Returns a dictionary of entities, grouped by type (e.g., {'PER': ['David', 'Jerusalem']}).
+    """
+    if not text or language not in NER_PIPELINES:
+        return {}
+
+    ner_pipeline = NER_PIPELINES[language]
+    ner_results = ner_pipeline(text)
+
+    # Process results to group sub-word tokens
+    entities = {}
+    current_entity = []
+    current_type = None
+
+    for result in ner_results:
+        entity_type = result['entity'].split('-')[-1] # B-PER -> PER, I-LOC -> LOC
+        word = result['word']
+
+        if result['entity'].startswith('B-') or (result['entity'].startswith('I-') and entity_type != current_type):
+            # Starting a new entity or switching entity type
+            if current_entity: # Save the previous entity
+                entity_name = "".join(current_entity).replace('##', '').strip()
+                if current_type not in entities:
+                    entities[current_type] = []
+                entities[current_type].append(entity_name)
+
+            current_entity = [word]
+            current_type = entity_type
+        elif result['entity'].startswith('I-') and entity_type == current_type:
+            # Continuing an entity
+            current_entity.append(word)
+        else: # O tag, entity ended
+            if current_entity:
+                entity_name = "".join(current_entity).replace('##', '').strip()
+                if current_type not in entities:
+                    entities[current_type] = []
+                entities[current_type].append(entity_name)
+                current_entity = []
+                current_type = None
+
+    # Add the last entity if it exists
+    if current_entity:
+        entity_name = "".join(current_entity).replace('##', '').strip()
+        if current_type not in entities:
+            entities[current_type] = []
+        entities[current_type].append(entity_name)
+
+    return entities
+
+def extract_specific_entity(text, entity_type, language='en', all_entities=None):
+    """
+    Extracts a specific entity from the given text, either by using regex for simple types
+    or by looking into the pre-extracted entities from the NER model.
+    """
     if not text:
         return None
 
     if entity_type == 'full_text':
         return text
 
-    if entity_type == 'date':
-        # Use dateparser for robust date extraction
-        parsed_date = search_dates(text, languages=[language])
-        return parsed_date[0][1].strftime('%Y-%m-%d') if parsed_date else None
-
-    if entity_type == 'time' or entity_type == 'hour':
-        # Regex for HH:MM format, optionally with AM/PM
-        match = regex.search(r'\b(\d{1,2}:\d{2})\s?(am|pm)?\b', text, regex.IGNORECASE)
-        return match.group(0) if match else None
-
+    # Handle simple regex-based extractions first
     if entity_type == 'email':
         match = regex.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
         return match.group(0) if match else None
-
     if entity_type == 'phone_number':
-        # Regex for various phone number formats
-        match = regex.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
+        # Improved regex to handle Hebrew numbers as well
+        match = regex.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\d{10}|\d{3}-\d{7}', text)
+        if match:
+            return "".join(filter(str.isdigit, match.group(0))) # Return only digits
+        return None
+    if entity_type == 'date':
+        parsed_date = search_dates(text, languages=[language])
+        return parsed_date[0][1].strftime('%Y-%m-%d') if parsed_date else None
+    if entity_type == 'time' or entity_type == 'hour':
+        match = regex.search(r'\b(\d{1,2}:\d{2})\s?(am|pm)?\b', text, regex.IGNORECASE)
         return match.group(0) if match else None
+
+    # Use NER results for complex types
+    if all_entities is None:
+        all_entities = extract_entities(text, language)
+
+    # Map our types to NER model types
+    type_mapping = {
+        'name': 'PER',
+        'location': 'LOC',
+        'organization': 'ORG'
+    }
+    ner_type = type_mapping.get(entity_type)
+
+    if ner_type and ner_type in all_entities:
+        return all_entities[ner_type][0] if all_entities[ner_type] else None # Return the first found
 
     return None
 
@@ -213,47 +295,76 @@ class ConversationEngine:
                 language = node_data.get('language', 'en')
                 self.variables['language'] = language
                 user_input_from_listen = listen_for_command(self.whisper_model, language=language)
+                self.variables['last_user_response'] = user_input_from_listen
 
                 if "סיים שיחה" in user_input_from_listen:
                     speak("מסיים את השיחה. להתראות!")
                     break
 
-                # Find the next node in the sequence
-                next_node_id = self._find_next_node_id(self.current_node_id)
+                # --- New Variable Node Logic ---
+                # Check for any connected variable nodes to decide on NER strategy
+                variable_nodes_data = []
+                temp_node_id = self.current_node_id
 
-                if not next_node_id:
-                    self.current_node_id = None
-                    continue
+                # We need to check all nodes connected to the 'variable' handle specifically
+                variable_edges = [e for e in self.edges if e['source'] == self.current_node_id and e.get('sourceHandle') == 'variable']
 
-                next_node = self.nodes.get(next_node_id)
+                for edge in variable_edges:
+                    target_node = self.nodes.get(edge['target'])
+                    if target_node and target_node.get('type') == 'variable':
+                        variable_nodes_data.append(target_node.get('data', {}))
 
-                # Check if the next node is a variable node for processing
-                if next_node and next_node.get('type') == 'variable':
-                    # It's a variable node, so perform extraction as a side-effect.
-                    extraction_type = next_node.get('data', {}).get('extractionType', 'full_text')
-                    variable_name = next_node.get('data', {}).get('variableName')
-                    if variable_name:
-                        extracted_value = extract_entity(user_input_from_listen, extraction_type, language)
-                        self.variables[variable_name] = extracted_value
-                        send_message({
-                            "type": "variable_update",
-                            "name": variable_name,
-                            "value": extracted_value,
-                            "status": "extracted" if extracted_value else "failed"
-                        })
+                # Decide on NER strategy
+                # If ANY connected variable node is in "focused" mode, run specific extractions.
+                # Otherwise, run the general NER.
+                is_focused_mode = any(not v.get('ignoreDuringListen', False) for v in variable_nodes_data)
 
-                    # Then, skip over it to the *next* node in the flow.
-                    self.current_node_id = self._find_next_node_id(next_node_id)
+                all_extracted_entities = None
+                if not is_focused_mode and variable_nodes_data:
+                     send_message({"type": "debug", "message": "General NER mode activated."})
+                     all_extracted_entities = extract_entities(user_input_from_listen, language)
+                     self.variables['last_ner_results'] = all_extracted_entities
+                     send_message({"type": "debug", "message": f"NER Results: {all_extracted_entities}"})
                 else:
-                    # It's a regular node, proceed as normal.
-                    self.current_node_id = next_node_id
+                    send_message({"type": "debug", "message": "Focused extraction mode activated."})
+
+
+                # Process each variable node
+                for var_data in variable_nodes_data:
+                    extraction_type = var_data.get('extractionType', 'full_text')
+                    variable_name = var_data.get('variableName')
+                    ignore_listen = var_data.get('ignoreDuringListen', False) # This is the new flag from the UI
+
+                    if not variable_name:
+                        continue
+
+                    extracted_value = None
+                    if ignore_listen:
+                        # General mode: look in the pre-computed NER results
+                        extracted_value = extract_specific_entity(user_input_from_listen, extraction_type, language, all_extracted_entities)
+                    else:
+                        # Focused mode: run specific extraction now
+                        extracted_value = extract_specific_entity(user_input_from_listen, extraction_type, language)
+
+                    self.variables[variable_name] = extracted_value
+                    send_message({
+                        "type": "variable_update",
+                        "name": variable_name,
+                        "value": str(extracted_value),
+                        "status": "extracted" if extracted_value is not None else "failed"
+                    })
+
+                # Move to the next node connected to the main flow (non-variable handle)
+                self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='condition')
+
 
             elif node_type == 'condition':
                 conditions = node_data.get('conditions', [])
+                last_response = self.variables.get('last_user_response', '').lower()
                 next_node_found = False
                 for i, condition in enumerate(conditions):
                     keyword = condition.get('keyword', '').lower()
-                    if keyword and keyword in user_input_from_listen:
+                    if keyword and keyword in last_response:
                         self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle=str(i))
                         next_node_found = True
                         break
@@ -392,6 +503,8 @@ if __name__ == "__main__":
     try:
         send_message({"type": "status_update", "status": "loading", "subtitle": "Loading speech model..."})
         whisper_model = whisper.load_model("base")
+
+        initialize_ner() # Load NER models
 
         engine = ConversationEngine(flow, whisper_model, token=token)
         engine.run()

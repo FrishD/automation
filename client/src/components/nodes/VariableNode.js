@@ -39,7 +39,23 @@ const VariableNode = ({ data, selected }) => {
               <option value="hour">Hour</option>
               <option value="email">Email</option>
               <option value="phone_number">Phone Number</option>
+              <option value="name">Name</option>
             </select>
+             <div className="flex items-center justify-between mt-3">
+              <label className="text-xs font-medium text-muted-light dark:text-muted-dark" htmlFor="ignore-during-listen">
+                Ignore during listen
+              </label>
+              <label htmlFor="ignore-during-listen-toggle" className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="ignore-during-listen-toggle"
+                  className="sr-only peer"
+                  checked={data.ignoreDuringListen || false}
+                  onChange={(e) => data.onChange({ ...data, ignoreDuringListen: e.target.checked })}
+                />
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 dark:peer-focus:ring-primary rounded-full peer dark:bg-slate-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-500 peer-checked:bg-primary"></div>
+              </label>
+            </div>
           </div>
         ) : (
           <div>

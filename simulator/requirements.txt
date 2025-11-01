@@ -9,3 +9,6 @@ regex
 langdetect
 edge-tts
 Babel
+transformers
+torch
+accelerate

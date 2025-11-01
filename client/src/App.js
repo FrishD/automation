@@ -109,6 +109,26 @@ const FlowEditor = () => {
     const onNodesChange = (changes) => setNodes(applyNodeChanges(changes, nodes));
     const onEdgesChange = (changes) => setEdges(applyEdgeChanges(changes, edges));
 
+    // Effect to dynamically update variable nodes based on connections
+    useEffect(() => {
+        let changed = false;
+        const newNodes = nodes.map(node => {
+            if (node.type === 'variable') {
+                const isConnected = edges.some(edge => edge.target === node.id && nodes.find(n => n.id === edge.source)?.type === 'listen' && edge.sourceHandle === 'variable');
+                if (node.data.isConnectedToListen !== isConnected) {
+                    changed = true;
+                    return { ...node, data: { ...node.data, isConnectedToListen: isConnected }};
+                }
+            }
+            return node;
+        });
+
+        if (changed) {
+            setNodes(newNodes);
+        }
+    }, [edges, nodes, setNodes]);
+
+
     useEffect(() => {
         const handleKeyDown = (event) => {
             if (event.key === 'Escape' && nodeToDrag) {
