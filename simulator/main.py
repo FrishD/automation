@@ -475,7 +475,7 @@ if __name__ == "__main__":
 
     try:
         send_message({"type": "status_update", "status": "loading", "subtitle": "Loading speech model..."})
-        whisper_model = whisper.load_model("base")
+        whisper_model = whisper.load_model("small")
 
         engine = ConversationEngine(flow, whisper_model, token=token)
         engine.run()
