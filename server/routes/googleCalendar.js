@@ -106,19 +106,16 @@ router.post('/availability', authenticateJWT, async (req, res) => {
             },
         });
 
+        const busyTimesWithBreaks = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy.map(busy => {
+            const busyEnd = new Date(busy.end);
+            busyEnd.setMinutes(busyEnd.getMinutes() + (settings.breakTime || 0));
+            return { ...busy, end: busyEnd.toISOString() };
+        });
+        const busyTimes = busyTimesWithBreaks;
+        console.log('Busy Times (with breaks):', JSON.stringify(busyTimes, null, 2));
+
         const { meetingDuration, breakTime } = settings;
         const availabilitySettings = settings.availability || [];
-
-        const busyTimesFromGoogle = busyTimesResponse.data.calendars[settings.calendarId || 'primary'].busy;
-        console.log('Busy Times from Google:', JSON.stringify(busyTimesFromGoogle, null, 2));
-
-        // Add break time to the end of each busy slot to enforce breaks between meetings.
-        const busyTimes = busyTimesFromGoogle.map(busy => {
-            const busyEnd = new Date(busy.end);
-            busyEnd.setMinutes(busyEnd.getMinutes() + (breakTime || 0));
-            return { start: busy.start, end: busyEnd.toISOString() };
-        });
-        console.log('Busy Times with Breaks:', JSON.stringify(busyTimes, null, 2));
 
         if (!meetingDuration || availabilitySettings.length === 0) {
             console.error('Missing calendar availability settings.');
@@ -141,46 +138,23 @@ router.post('/availability', authenticateJWT, async (req, res) => {
         };
 
         const checkSlotAvailability = (slotStart, slotEnd) => {
-            console.log(`\nChecking slot: ${slotStart.toISOString()} to ${slotEnd.toISOString()}`);
-
             const dayOfWeekInTZ = getDayInTimezone(slotStart, timeZone);
             const dayRule = availabilitySettings.find(rule => dayMap[rule.day] === dayOfWeekInTZ);
-            if (!dayRule) {
-                console.log(`No availability rule for this day.`);
-                return { available: false, reason: 'NO_RULE_FOR_DAY' };
-            }
-
-            console.log(`Day of week in TZ (${timeZone}): ${dayOfWeekInTZ}, Found Rule:`, JSON.stringify(dayRule));
+            if (!dayRule) return { available: false, reason: 'NO_RULE_FOR_DAY' };
 
             const slotStartTimeStr = getTimeStringInTimezone(slotStart, timeZone);
             const slotEndTimeStr = getTimeStringInTimezone(slotEnd, timeZone);
-            console.log(`Slot time in TZ (${timeZone}): ${slotStartTimeStr} - ${slotEndTimeStr}`);
 
-            const isWithinRule = dayRule.slots.some(ruleSlot => {
-                const check = slotStartTimeStr >= ruleSlot.start && slotEndTimeStr <= ruleSlot.end;
-                console.log(`  - Checking against rule slot ${ruleSlot.start}-${ruleSlot.end}: ${check}`);
-                return check;
-            });
-
-            if (!isWithinRule) {
-                console.log(`Slot is outside of defined business hours.`);
-                return { available: false, reason: 'OUT_OF_HOURS', workingHours: dayRule.slots };
-            }
+            const isWithinRule = dayRule.slots.some(ruleSlot => slotStartTimeStr >= ruleSlot.start && slotEndTimeStr <= ruleSlot.end);
+            if (!isWithinRule) return { available: false, reason: 'OUT_OF_HOURS', workingHours: dayRule.slots };
 
             const isOverlapping = busyTimes.some(busy => {
                 const busyStart = new Date(busy.start);
                 const busyEnd = new Date(busy.end);
-                const overlap = (slotStart < busyEnd && slotEnd > busyStart);
-                if (overlap) console.log(`  - Overlaps with busy slot: ${busy.start} - ${busy.end}`);
-                return overlap;
+                return (slotStart < busyEnd && slotEnd > busyStart);
             });
+            if (isOverlapping) return { available: false, reason: 'BUSY' };
 
-            if (isOverlapping) {
-                console.log(`Slot is overlapping with a busy time.`);
-                return { available: false, reason: 'BUSY' };
-            }
-
-            console.log(`Slot is available.`);
             return { available: true };
         };
 
@@ -212,12 +186,10 @@ router.post('/availability', authenticateJWT, async (req, res) => {
                         start: potentialSlotStart.toISOString(),
                         end: potentialSlotEnd.toISOString(),
                     };
-                    break; // Found a valid slot.
+                    break;
                 }
 
-                // Move to the next potential slot, using the break time as the increment.
-                const increment = (breakTime || 15) * 60000;
-                potentialSlotStart.setTime(potentialSlotStart.getTime() + increment);
+                potentialSlotStart.setTime(potentialSlotStart.getTime() + 15 * 60000); // Always increment by 15 minutes
             }
         }
 

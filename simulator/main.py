@@ -32,6 +32,14 @@ def format_spoken_datetime(iso_str, language='en'):
     # Format: "EEEE, MMMM d 'at' h:mm a" -> "Tuesday, October 28 at 3:00 PM"
     return format_datetime(dt_local, "EEEE, MMMM d 'at' h:mm a", locale=locale)
 
+def format_spoken_time(time_str):
+    """Formats a 'HH:MM' string into a spoken format, e.g., '5 PM'."""
+    try:
+        time_obj = datetime.strptime(time_str, '%H:%M')
+        return time_obj.strftime('%I:%M %p').lstrip('0').replace(':00', '')
+    except ValueError:
+        return time_str # Fallback
+
 # --- Helper Functions ---
 def send_message(data):
     """Sends a JSON message to stdout."""
@@ -264,7 +272,7 @@ class ConversationEngine:
                 self.current_node_id = None
 
             elif node_type == 'google_calendar':
-                language_code = node_data.get('language', 'en')
+                language_code = node_data.get('language', 'en') # Prioritize node-specific language
                 send_message({"type": "debug", "message": f"Google Calendar Node: Language set to '{language_code}'"})
 
                 prompt_text = "מתי תרצה לקבוע את הפגישה? למשל, 'מחר בשלוש'." if language_code == 'he' else "When would you like to book the meeting? For example, 'tomorrow at 3pm'."
@@ -279,9 +287,8 @@ class ConversationEngine:
                 settings = {
                     'TIMEZONE': 'Asia/Jerusalem',
                     'RETURN_AS_TIMEZONE_AWARE': True,
-                    'PREFER_DATES_FROM': 'future'
+                    'PREFER_DATES_FROM': 'future',
                 }
-                # Add PREFER_DATES_FROM to correctly handle times like "9am"
                 search_results = search_dates(cleaned_response, languages=[language_code], settings=settings)
                 parsed_date = search_results[0][1] if search_results else None
                 send_message({"type": "debug", "message": f"Parsed date: {parsed_date.isoformat() if parsed_date else 'None'}"})
@@ -309,7 +316,6 @@ class ConversationEngine:
                             'start': parsed_date.isoformat(),
                             'end': (parsed_date + timedelta(minutes=node_data.get('meetingDuration', 30))).isoformat()
                         }
-                        # PROCEED_WITH_BOOKING_LOGIC
                         speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?", language=language_code)
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
                         if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
@@ -327,18 +333,16 @@ class ConversationEngine:
                         else:
                             speak("Ok, I won't schedule it.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
-
-                    else: # Not available, check reason
+                    else:
                         reason = availability.get('reason')
                         next_slot = availability.get('nextAvailableSlot')
 
                         if reason == 'OUT_OF_HOURS' and availability.get('workingHours'):
-                            # Handle multiple time slots in a day
                             hours_list = availability['workingHours']
-                            hours_str = " and ".join([f"from {slot['start']} to {slot['end']}" for slot in hours_list])
+                            hours_str = " and ".join([f"from {format_spoken_time(slot['start'])} to {format_spoken_time(slot['end'])}" for slot in hours_list])
                             speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language=language_code)
-                        else: # Busy or other reasons
-                             speak("I'm sorry, that time is unavailable.", language=language_code)
+                        else:
+                            speak("I'm sorry, that time is unavailable.", language=language_code)
 
                         if next_slot:
                             speak(f"The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?", language=language_code)
@@ -357,10 +361,10 @@ class ConversationEngine:
                                 self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
                             else:
                                 speak("Alright. Is there another time you'd like to check?", language=language_code)
-                                continue # Re-ask the initial question
+                                continue
                         else:
-                             speak("I couldn't find any other available slots in the near future.", language=language_code)
-                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
+                            speak("I'm sorry, I couldn't find any available slots in the near future.", language=language_code)
+                            self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                 except requests.exceptions.RequestException as e:
                     error_message = str(e.response.text) if e.response else str(e)

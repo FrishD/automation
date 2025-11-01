@@ -51,8 +51,10 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // Re-serializing and parsing ensures that all nested data, including the `googleCalendar` settings, is correctly prepared.
       const flowData = JSON.parse(JSON.stringify(flow.toObject()));
+      console.log('--- Flow Data Sent to Simulator ---');
+      console.log(JSON.stringify(flowData, null, 2));
+      console.log('------------------------------------');
       const pythonProcess = spawn('python3', ['../simulator/main.py']);
 
       // Pass both flow and token to the Python script
