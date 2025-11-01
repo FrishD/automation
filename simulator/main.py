@@ -315,6 +315,9 @@ class ConversationEngine:
 
                 # Clean the response to help the parser
                 cleaned_response = user_response.replace('.', '')
+                if language_code == 'he':
+                    # Replace Hebrew "at" preposition if it precedes a number word
+                    cleaned_response = regex.sub(r'\bב(?=\s*(?:אחת|שתיים|שלוש|ארבע|חמש|שש|שבע|שמונה|תשע|עשר|אחת עשרה|שתיים עשרה))', '', cleaned_response)
                 send_message({"type": "debug", "message": f"Trying to parse date from cleaned user response: '{cleaned_response}'"})
 
 
@@ -352,7 +355,7 @@ class ConversationEngine:
                         }
                         speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?", language=language_code)
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
-                        if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                        if any(word in confirmation for word in ["yes", "ok", "ken", "כן"]):
 
                             summary_template = node_data.get('googleCalendar', {}).get('meetingSummary', 'Meeting')
                             description_template = node_data.get('googleCalendar', {}).get('meetingDescription', '')
@@ -395,10 +398,12 @@ class ConversationEngine:
                             else:
                                 self.current_node_id = next_node_after_success
 
-                            speak("Great, your meeting is confirmed.", language=language_code)
+                            confirmation_text = "נהדר, הפגישה נקבעה." if language_code == 'he' else "Great, your meeting is confirmed."
+                            speak(confirmation_text, language=language_code)
 
                         else:
-                            speak("Ok, I won't schedule it.", language=language_code)
+                            rejection_text = "בסדר, לא אקבע את הפגישה." if language_code == 'he' else "Ok, I won't schedule it."
+                            speak(rejection_text, language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
                     else:
                         reason = availability.get('reason')
@@ -406,15 +411,23 @@ class ConversationEngine:
 
                         if reason == 'OUT_OF_HOURS' and availability.get('workingHours'):
                             hours_list = availability['workingHours']
-                            hours_str = " and ".join([f"from {format_spoken_time(slot['start'], language_code)} to {format_spoken_time(slot['end'], language_code)}" for slot in hours_list])
-                            speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language=language_code)
+                            if language_code == 'he':
+                                hours_str = " ו- ".join([f"מ-{format_spoken_time(slot['start'], language_code)} עד {format_spoken_time(slot['end'], language_code)}" for slot in hours_list])
+                                speak(f"הזמן הזה הוא מחוץ לשעות הפעילות. באותו יום, השעות הן {hours_str}.", language=language_code)
+                            else:
+                                hours_str = " and ".join([f"from {format_spoken_time(slot['start'], language_code)} to {format_spoken_time(slot['end'], language_code)}" for slot in hours_list])
+                                speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language=language_code)
                         else:
-                            speak("I'm sorry, that time is unavailable.", language=language_code)
+                            unavailable_text = "אני מצטער, הזמן הזה אינו פנוי." if language_code == 'he' else "I'm sorry, that time is unavailable."
+                            speak(unavailable_text, language=language_code)
 
                         if next_slot:
-                            speak(f"The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?", language=language_code)
+                            next_slot_text_en = f"The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?"
+                            next_slot_text_he = f"התור הפנוי הבא הוא ב{format_spoken_datetime(next_slot['start'], language_code)}. תרצה שאקבע אותו במקום?"
+                            speak(next_slot_text_he if language_code == 'he' else next_slot_text_en, language=language_code)
+
                             confirmation = listen_for_command(self.whisper_model, language=language_code)
-                            if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                            if any(word in confirmation for word in ["yes", "ok", "ken", "כן"]):
                                 event_payload = {
                                     "flowId": self.flow_id,
                                     "nodeId": self.current_node_id,
@@ -424,13 +437,15 @@ class ConversationEngine:
                                 }
                                 create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
                                 create_response.raise_for_status()
-                                speak("Great, your meeting is confirmed.", language=language_code)
+                                confirmation_text = "נהדר, הפגישה נקבעה." if language_code == 'he' else "Great, your meeting is confirmed."
+                                speak(confirmation_text, language=language_code)
                                 self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
                             else:
-                                speak("Alright. Is there another time you'd like to check?", language=language_code)
+                                speak("בסדר. תרצה לבדוק זמן אחר?" if language_code == 'he' else "Alright. Is there another time you'd like to check?", language=language_code)
                                 continue
                         else:
-                            speak("I'm sorry, I couldn't find any available slots in the near future.", language=language_code)
+                            no_slots_text = "אני מצטער, לא מצאתי תורים פנויים בזמן הקרוב." if language_code == 'he' else "I'm sorry, I couldn't find any available slots in the near future."
+                            speak(no_slots_text, language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                 except requests.exceptions.RequestException as e:
