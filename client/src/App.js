@@ -191,7 +191,29 @@ const FlowEditor = () => {
         }
     }, [currentFlowId, flowName, nodes, edges]);
 
-    const onConnect = useCallback((params) => setEdges(addEdge(params, edges)), [edges, setEdges]);
+    const onConnect = useCallback((params) => {
+        const { source, target } = params;
+        const sourceNode = nodes.find(node => node.id === source);
+        const targetNode = nodes.find(node => node.id === target);
+
+        if (targetNode && targetNode.type === 'variable' && sourceNode) {
+            const updatedNodes = nodes.map(node => {
+                if (node.id === target) {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            sourceNodeType: sourceNode.type,
+                        },
+                    };
+                }
+                return node;
+            });
+            setNodes(updatedNodes);
+        }
+
+        setEdges(addEdge(params, edges));
+    }, [nodes, edges, setNodes, setEdges]);
 
     const onDragOver = useCallback((event) => {
         event.preventDefault();
