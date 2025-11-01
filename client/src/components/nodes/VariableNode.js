@@ -5,10 +5,12 @@ import { Handle, Position } from 'reactflow';
 const SOURCE_EXTRACTIONS = {
   listen: [
     { value: 'full_text', label: 'Full Text' },
+    { value: 'name', label: 'Name' },
     { value: 'date', label: 'Date' },
     { value: 'time', label: 'Time' },
     { value: 'email', label: 'Email' },
     { value: 'phone_number', label: 'Phone Number' },
+    { value: 'boolean', label: 'Yes/No' },
   ],
   condition: [
     { value: 'user_response', label: 'User Response' },
@@ -46,93 +48,98 @@ const VariableNode = ({ data, selected }) => {
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 rounded-lg bg-white dark:bg-slate-800 shadow-lg border z-10 w-80 transition-all duration-300 ${
+      className={`relative flex flex-col rounded-lg bg-white dark:bg-slate-800 shadow-lg border z-10 w-80 transition-all duration-300 ${
         data.isHighlighted ? 'glow' : selected ? 'border-primary ring-4 ring-primary/20' : 'border-slate-200 dark:border-slate-700'
       }`}
     >
-      <div className="flex items-center gap-3">
+      {/* Header */}
+      <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-t-lg border-b border-slate-200 dark:border-slate-700">
         <span className="material-symbols-outlined text-primary text-2xl">data_object</span>
-        <span className="font-semibold text-sm">{isConnectedToSource ? 'Extract & Assign Variables' : 'Set Static Variable'}</span>
+        <span className="font-semibold text-sm">{isConnectedToSource ? 'Extract & Assign' : 'Set Static Variable'}</span>
       </div>
-      <div className="space-y-4 pt-3 border-t border-border-light dark:border-border-dark">
+
+      {/* Body */}
+      <div className="p-4 space-y-4">
         {isConnectedToSource ? (
           <>
-            <p className="text-xs text-center text-muted-light dark:text-muted-dark">
-              Extracting from <span className="font-semibold text-primary">{sourceNodeType}</span> node.
+            <p className="text-xs text-center text-muted-light dark:text-muted-dark bg-slate-100 dark:bg-slate-900/50 py-1.5 px-3 rounded-md">
+              Source: <span className="font-semibold text-primary uppercase">{sourceNodeType}</span>
             </p>
-            {assignments.map((assignment, index) => (
-              <div key={index} className="p-3 space-y-2 bg-slate-50 dark:bg-slate-900/50 rounded-lg relative">
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className="text-xs font-medium text-muted-light dark:text-muted-dark">Source Data</label>
-                        <select
-                        className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-border-light dark:border-border-dark rounded-md bg-background-light dark:bg-slate-700"
-                        value={assignment.sourceType}
-                        onChange={(e) => handleAssignmentChange(index, 'sourceType', e.target.value)}
-                        >
-                        <option value="">Select data to extract...</option>
-                        {availableExtractions.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-muted-light dark:text-muted-dark">Variable Name</label>
-                        <input
-                        className="nodrag mt-1 w-full px-3 py-1.5 text-sm border rounded-md"
-                        placeholder="e.g., user_email"
-                        type="text"
-                        value={assignment.variableName}
-                        onChange={(e) => handleAssignmentChange(index, 'variableName', e.target.value)}
-                        />
-                    </div>
-                </div>
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+              {assignments.map((assignment, index) => (
+                <div key={index} className="p-3 space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 relative group">
+                  <div className="flex flex-col gap-2">
+                      <div>
+                          <label className="text-xs font-medium text-muted-light dark:text-muted-dark">Extract</label>
+                          <select
+                            className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+                            value={assignment.sourceType}
+                            onChange={(e) => handleAssignmentChange(index, 'sourceType', e.target.value)}
+                          >
+                            <option value="">Select data...</option>
+                            {availableExtractions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <span className="material-symbols-outlined text-slate-400">south</span>
+                      </div>
+                      <div>
+                          <label className="text-xs font-medium text-muted-light dark:text-muted-dark">And Assign to</label>
+                          <input
+                            className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+                            placeholder="variable_name"
+                            type="text"
+                            value={assignment.variableName}
+                            onChange={(e) => handleAssignmentChange(index, 'variableName', e.target.value)}
+                          />
+                      </div>
+                  </div>
 
-                {assignments.length > 1 && (
-                  <button onClick={() => removeAssignment(index)} className="absolute top-1 right-1 text-red-500 hover:text-red-700">
-                    <span className="material-symbols-outlined text-base">delete</span>
-                  </button>
-                )}
-              </div>
-            ))}
+                  {assignments.length > 1 && (
+                    <button onClick={() => removeAssignment(index)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
             <button
               onClick={addAssignment}
-              className="nodrag w-full mt-2 px-3 py-1.5 text-xs font-semibold text-primary border border-primary rounded-md hover:bg-primary/10"
+              className="nodrag w-full mt-2 px-3 py-1.5 text-xs font-semibold text-primary border-2 border-primary/50 rounded-md hover:bg-primary/10 transition-colors"
             >
-              + Add Assignment
+              + Add Extraction
             </button>
           </>
         ) : (
-          <div>
-            <label className="text-xs font-medium text-muted-light dark:text-muted-dark">Value</label>
-            <textarea
-              className="nodrag mt-1 w-full px-3 py-1.5 text-sm border rounded-md"
-              placeholder="Enter a static value or expression"
-              rows="2"
-              value={data.value || ''}
-              onChange={(e) => data.onChange({ ...data, value: e.target.value })}
-            ></textarea>
-             <label className="text-xs font-medium text-muted-light dark:text-muted-dark mt-2 block">Variable Name</label>
-             <input
-                className="nodrag mt-1 w-full px-3 py-1.5 text-sm border rounded-md"
-                placeholder="e.g., my_variable"
-                type="text"
-                value={data.variableName || ''}
-                onChange={(e) => data.onChange({ ...data, variableName: e.target.value })}
-            />
+          <div className="space-y-3">
+            <p className="text-xs text-center text-muted-light dark:text-muted-dark">No source connected. Set a static value.</p>
+             <div>
+              <label className="text-xs font-medium text-muted-light dark:text-muted-dark">Variable Name</label>
+              <input
+                  className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+                  placeholder="e.g., my_variable"
+                  type="text"
+                  value={data.variableName || ''}
+                  onChange={(e) => data.onChange({ ...data, variableName: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-light dark:text-muted-dark">Value</label>
+              <textarea
+                className="nodrag mt-1 w-full px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary focus:border-primary"
+                placeholder="Enter a static value or expression"
+                rows="2"
+                value={data.value || ''}
+                onChange={(e) => data.onChange({ ...data, value: e.target.value })}
+              ></textarea>
+            </div>
           </div>
         )}
       </div>
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-400 border-2 border-white dark:border-slate-800"
-      />
+      <Handle type="target" position={Position.Left} className="!bg-slate-400" />
+      <Handle type="source" position={Position.Right} className="!bg-slate-400" />
     </div>
   );
 };

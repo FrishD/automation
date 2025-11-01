@@ -16,9 +16,12 @@ from mutagen.mp3 import MP3
 from babel.dates import format_datetime
 from datetime import datetime, timedelta
 import pytz
+from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
 
 # --- Configuration ---
 API_BASE_URL = "http://localhost:5000/api/flows"
+# --- Global NER Models ---
+ner_pipelines = {}
 
 def format_spoken_datetime(iso_str, language='en'):
     """Formats an ISO datetime string into a natural spoken format."""
@@ -127,13 +130,22 @@ def extract_entity(text, entity_type, language='en'):
     if entity_type == 'full_text':
         return text
 
+    if entity_type == 'name':
+        ner_pipeline = ner_pipelines.get(language)
+        if not ner_pipeline:
+            return None
+        entities = ner_pipeline(text)
+        for entity in entities:
+             # heBERT uses 'PER', bert-base-NER uses 'I-PER'
+            if entity['entity_group'] == 'PER' or 'PER' in entity['entity_group']:
+                return entity['word']
+        return None
+
     if entity_type == 'date':
-        # Use dateparser for robust date extraction
-        parsed_date = search_dates(text, languages=[language])
-        return parsed_date[0][1].strftime('%Y-%m-%d') if parsed_date else None
+        parsed_dates = search_dates(text, languages=[language])
+        return parsed_dates[0][1].strftime('%Y-%m-%d') if parsed_dates else None
 
     if entity_type == 'time' or entity_type == 'hour':
-        # Regex for HH:MM format, optionally with AM/PM
         match = regex.search(r'\b(\d{1,2}:\d{2})\s?(am|pm)?\b', text, regex.IGNORECASE)
         return match.group(0) if match else None
 
@@ -142,9 +154,12 @@ def extract_entity(text, entity_type, language='en'):
         return match.group(0) if match else None
 
     if entity_type == 'phone_number':
-        # Regex for various phone number formats
         match = regex.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
         return match.group(0) if match else None
+
+    if entity_type == 'boolean':
+        positive_words = ['yes', 'ok', 'sure', 'absolutely', 'כן', 'בטח', 'בהחלט']
+        return any(word in text.lower() for word in positive_words)
 
     return None
 
@@ -274,7 +289,9 @@ class ConversationEngine:
                         self.current_node_id = default_next_node
                     else:
                         # Fallback behavior if no default path is set
-                        speak("I didn't understand. Could you please repeat?", language=self.variables.get('language', 'en'))
+                        lang = self.variables.get('language', 'en')
+                        message = "לא הבנתי. אפשר לחזור על זה?" if lang == 'he' else "I didn't understand. Could you please repeat?"
+                        speak(message, language=lang)
                         # Attempt to loop back to the last listen node to re-prompt the user
                         listen_nodes = [nid for nid, n in self.nodes.items() if n['type'] == 'listen']
                         if listen_nodes:
@@ -318,7 +335,8 @@ class ConversationEngine:
                 send_message({"type": "debug", "message": f"Parsed date: {parsed_date.isoformat() if parsed_date else 'None'}"})
 
                 if not parsed_date or parsed_date < datetime.now(pytz.timezone('Asia/Jerusalem')):
-                    speak("I'm sorry, I couldn't find a valid future date in your request. Please try again.", language=language_code)
+                    error_message = "סליחה, לא הצלחתי למצוא תאריך עתידי תקין בבקשה שלך. אנא נסה שוב." if language_code == 'he' else "I'm sorry, I couldn't find a valid future date in your request. Please try again."
+                    speak(error_message, language=language_code)
                     continue
 
                 try:
@@ -340,9 +358,12 @@ class ConversationEngine:
                             'start': parsed_date.isoformat(),
                             'end': (parsed_date + timedelta(minutes=node_data.get('meetingDuration', 30))).isoformat()
                         }
-                        speak(f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?", language=language_code)
+
+                        prompt_text = f"מצאתי פגישה פנויה ב {format_spoken_datetime(slot_to_book['start'], language_code)}. האם לקבוע לך אותה?" if language_code == 'he' else f"I found an opening at {format_spoken_datetime(slot_to_book['start'], language_code)}. Should I book it for you?"
+                        speak(prompt_text, language=language_code)
+
                         confirmation = listen_for_command(self.whisper_model, language=language_code)
-                        if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                        if "yes" in confirmation or "ok" in confirmation or "כן" in confirmation:
 
                             summary_template = node_data.get('googleCalendar', {}).get('meetingSummary', 'Meeting')
                             description_template = node_data.get('googleCalendar', {}).get('meetingDescription', '')
@@ -351,27 +372,21 @@ class ConversationEngine:
                             description = regex.sub(r'\{([^}]+)\}', replace_var, description_template)
 
                             event_payload = {
-                                "flowId": self.flow_id,
-                                "nodeId": self.current_node_id,
-                                "startTime": slot_to_book['start'],
-                                "endTime": slot_to_book['end'],
+                                "flowId": self.flow_id, "nodeId": self.current_node_id,
+                                "startTime": slot_to_book['start'], "endTime": slot_to_book['end'],
                                 "attendees": [self.variables.get('caller_email')],
-                                "summary": summary,
-                                "description": description
+                                "summary": summary, "description": description
                             }
                             create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
                             create_response.raise_for_status()
                             created_event = create_response.json()
 
-                            # --- Post-creation variable assignment ---
                             next_node_after_success = self._find_next_node_id(self.current_node_id, source_handle='success')
                             if next_node_after_success and self.nodes.get(next_node_after_success, {}).get('type') == 'variable':
                                 assignments = self.nodes[next_node_after_success].get('data', {}).get('assignments', [])
                                 for assignment in assignments:
-                                    var_name = assignment.get('variableName')
-                                    source_type = assignment.get('sourceType')
+                                    var_name, source_type = assignment.get('variableName'), assignment.get('sourceType')
                                     if not var_name or not source_type: continue
-
                                     value_map = {
                                         'event_start_time': created_event.get('start', {}).get('dateTime'),
                                         'event_end_time': created_event.get('end', {}).get('dateTime'),
@@ -379,54 +394,56 @@ class ConversationEngine:
                                         'event_description': created_event.get('description'),
                                         'event_location': created_event.get('location'),
                                     }
-                                    if source_type in value_map:
-                                        self.variables[var_name] = value_map[source_type]
-                                self.current_node_id = self._find_next_node_id(next_node_after_success) # Skip variable node
+                                    if source_type in value_map: self.variables[var_name] = value_map[source_type]
+                                self.current_node_id = self._find_next_node_id(next_node_after_success)
                             else:
                                 self.current_node_id = next_node_after_success
 
-                            speak("Great, your meeting is confirmed.", language=language_code)
+                            speak("נהדר, הפגישה שלך נקבעה." if language_code == 'he' else "Great, your meeting is confirmed.", language=language_code)
 
                         else:
-                            speak("Ok, I won't schedule it.", language=language_code)
+                            speak("בסדר, לא אקבע אותה." if language_code == 'he' else "Ok, I won't schedule it.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
                     else:
-                        reason = availability.get('reason')
-                        next_slot = availability.get('nextAvailableSlot')
+                        reason, next_slot = availability.get('reason'), availability.get('nextAvailableSlot')
 
                         if reason == 'OUT_OF_HOURS' and availability.get('workingHours'):
                             hours_list = availability['workingHours']
-                            hours_str = " and ".join([f"from {format_spoken_time(slot['start'], language_code)} to {format_spoken_time(slot['end'], language_code)}" for slot in hours_list])
-                            speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language=language_code)
+                            if language_code == 'he':
+                                hours_str = " ו-".join([f"מ-{format_spoken_time(s['start'], 'he')} עד {format_spoken_time(s['end'], 'he')}" for s in hours_list])
+                                speak(f"הזמן הזה הוא מחוץ לשעות הפעילות. ביום הזה, השעות הן {hours_str}.", language='he')
+                            else:
+                                hours_str = " and ".join([f"from {format_spoken_time(s['start'])} to {format_spoken_time(s['end'])}" for s in hours_list])
+                                speak(f"That time is outside of business hours. On that day, hours are {hours_str}.", language='en')
                         else:
-                            speak("I'm sorry, that time is unavailable.", language=language_code)
+                            speak("סליחה, הזמן הזה אינו זמין." if language_code == 'he' else "I'm sorry, that time is unavailable.", language=language_code)
 
                         if next_slot:
-                            speak(f"The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?", language=language_code)
+                            prompt_text = f"התור הפנוי הבא הוא ב {format_spoken_datetime(next_slot['start'], language_code)}. האם תרצה לקבוע אותו במקום?" if language_code == 'he' else f"The next opening is on {format_spoken_datetime(next_slot['start'], language_code)}. Would you like to book that instead?"
+                            speak(prompt_text, language=language_code)
+
                             confirmation = listen_for_command(self.whisper_model, language=language_code)
-                            if "yes" in confirmation or "ok" in confirmation or "ken" in confirmation:
+                            if "yes" in confirmation or "ok" in confirmation or "כן" in confirmation:
                                 event_payload = {
-                                    "flowId": self.flow_id,
-                                    "nodeId": self.current_node_id,
-                                    "startTime": next_slot['start'],
-                                    "endTime": next_slot['end'],
+                                    "flowId": self.flow_id, "nodeId": self.current_node_id,
+                                    "startTime": next_slot['start'], "endTime": next_slot['end'],
                                     "attendees": [self.variables.get('caller_email')]
                                 }
                                 create_response = requests.post("http://localhost:5000/api/google-calendar/create-event", json=event_payload, headers=headers)
                                 create_response.raise_for_status()
-                                speak("Great, your meeting is confirmed.", language=language_code)
+                                speak("נהדר, הפגישה שלך נקבעה." if language_code == 'he' else "Great, your meeting is confirmed.", language=language_code)
                                 self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='success')
                             else:
-                                speak("Alright. Is there another time you'd like to check?", language=language_code)
+                                speak("בסדר. האם תרצה לבדוק זמן אחר?" if language_code == 'he' else "Alright. Is there another time you'd like to check?", language=language_code)
                                 continue
                         else:
-                            speak("I'm sorry, I couldn't find any available slots in the near future.", language=language_code)
+                            speak("סליחה, לא מצאתי זמנים פנויים בעתיד הקרוב." if language_code == 'he' else "I'm sorry, I couldn't find any available slots in the near future.", language=language_code)
                             self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
                 except requests.exceptions.RequestException as e:
                     error_message = str(e.response.text) if e.response else str(e)
                     send_message({"type": "error", "message": error_message})
-                    speak("Sorry, I'm having trouble connecting to the calendar. Please try again later.", language=language_code)
+                    speak("סליחה, יש לי בעיה להתחבר ליומן. אנא נסה שוב מאוחר יותר." if language_code == 'he' else "Sorry, I'm having trouble connecting to the calendar. Please try again later.", language=language_code)
                     self.current_node_id = self._find_next_node_id(self.current_node_id, source_handle='failure')
 
 
@@ -438,6 +455,16 @@ class ConversationEngine:
 
 if __name__ == "__main__":
     try:
+        # Load NER models
+        send_message({"type": "status_update", "status": "loading", "subtitle": "Loading NER models..."})
+        ner_pipelines['en'] = pipeline("ner", model="dslim/bert-base-NER", aggregation_strategy="simple")
+
+        he_tokenizer = AutoTokenizer.from_pretrained("avichr/heBERT_NER")
+        he_model = AutoModelForTokenClassification.from_pretrained("avichr/heBERT_NER")
+        ner_pipelines['he'] = pipeline("ner", model=he_model, tokenizer=he_tokenizer, aggregation_strategy="simple")
+
+        send_message({"type": "status_update", "status": "loading", "subtitle": "NER models loaded."})
+
         initial_message_string = sys.stdin.read()
         initial_message = json.loads(initial_message_string)
         flow = initial_message['flow']
