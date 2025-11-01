@@ -9,3 +9,4 @@ regex
 langdetect
 edge-tts
 Babel
+certifi
