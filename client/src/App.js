@@ -68,6 +68,13 @@ api.interceptors.request.use(config => {
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
+const nodeTypes = {
+    start: StartNode, speak: SpeakNode, listen: ListenNode, condition: ConditionNode,
+    end: EndNode, variable: VariableNode, wait: WaitNode, loop: LoopNode,
+    play_audio: PlayAudioNode, confirmation: ConfirmationNode, summary: SummaryNode,
+    google_calendar: GoogleCalendarNode, note: NoteNode,
+};
+
 const FlowEditor = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     useEffect(() => {
@@ -79,13 +86,6 @@ const FlowEditor = () => {
         localStorage.removeItem('jwtToken');
         setIsLoggedIn(false);
     };
-
-    const nodeTypes = useMemo(() => ({
-        start: StartNode, speak: SpeakNode, listen: ListenNode, condition: ConditionNode,
-        end: EndNode, variable: VariableNode, wait: WaitNode, loop: LoopNode,
-        play_audio: PlayAudioNode, confirmation: ConfirmationNode, summary: SummaryNode,
-        google_calendar: GoogleCalendarNode, note: NoteNode,
-    }), []);
 
     const reactFlowWrapper = useRef(null);
     const [ flowState, { set: setFlowState, reset: resetFlowState, undo: undoFlowState, redo: redoFlowState, canUndo, canRedo } ] = useUndo({ nodes: [], edges: [] });
@@ -149,6 +149,26 @@ const FlowEditor = () => {
     const onNodeDragStop = useCallback(() => {
         setNodeToDrag(null);
     }, []);
+
+    // Effect to prevent auto-connecting new nodes
+    const prevNodesLength = useRef(nodes.length);
+    useEffect(() => {
+        if (nodes.length > prevNodesLength.current) {
+            // A node was added
+            const newNode = nodes[nodes.length - 1];
+            const edgesToNewNode = edges.filter(e => e.target === newNode.id || e.source === newNode.id);
+
+            // If a new node is created with edges, it's likely an auto-connection.
+            // A better check might be needed if there are legitimate auto-connections.
+            if (edgesToNewNode.length > 0) {
+                 // Simple approach: remove any edges connected to the new node.
+                 // This assumes the user should always connect nodes manually after dropping.
+                setEdges(edges.filter(e => e.target !== newNode.id && e.source !== newNode.id));
+            }
+        }
+        prevNodesLength.current = nodes.length;
+    }, [nodes, edges, setEdges]);
+
 
     const createNewFlow = useCallback(async () => {
         try {
